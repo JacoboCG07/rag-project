@@ -1,0 +1,2 @@
+# TXT extractor tests package
+

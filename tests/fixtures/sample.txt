@@ -1,0 +1,6 @@
+This is a sample text file for testing.
+It contains multiple lines of text.
+This file is used for testing the TXTExtractor.
+
+Line 4: More content here.
+Line 5: Final line of the test file.
