@@ -84,9 +84,8 @@ class RAGPipeline:
         file_name = document_data.metadata.file_name
 
         # Process and insert document in milvus
-        #mandarle el file_id
         success, message = self.document_processor.process_and_insert(
-            file_name=file_name,
+            file_id=file_id,
             document_data=document_data,
             process_images=extract_process_images,
             partition_name=partition_name

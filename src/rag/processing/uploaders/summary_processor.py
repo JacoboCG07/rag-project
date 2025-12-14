@@ -37,18 +37,17 @@ class SummaryProcessor:
         self,
         *,
         document_data: ExtractionResult,
+        file_id: str,
         partition_name: str
     ) -> Tuple[bool, str]:
         """
         Generates summary from content and uploads it to Milvus.
 
         Args:
-            content: List of texts (pages) from the document.
+            document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData), 
+                          and 'metadata' (BaseFileMetadata or subclass).
             file_id: Unique file ID.
-            file_name: File name.
-            source_id: Source ID (optional, uses file_id if not provided).
-            file_type: File type (default 'document').
-            num_images: Number of images in the document.
+            partition_name: Partition name for Milvus.
 
         Returns:
             Tuple[bool, str]: (success, message).
@@ -57,11 +56,22 @@ class SummaryProcessor:
             ValueError: If content is empty or invalid.
         """
         try:
+            # Validate data format
+            if not isinstance(document_data, ExtractionResult):
+                raise ValueError("document_data must be an ExtractionResult instance")
+
+            content = document_data.content
+            images = document_data.images or []
+            metadata_obj = document_data.metadata
+
             if not content or not isinstance(content, list):
                 raise ValueError("content must be a non-empty list of texts")
 
-            # Use source_id or file_id as fallback
-            partition_name = source_id or file_id
+            # Get file_name and file_type from metadata
+            file_name = metadata_obj.file_name
+            file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
+            source_id = file_id  # Use file_id as source_id
+            num_images = len(images) if images else 0
 
             # Create partition if it doesn't exist
             self.milvus_client.create_partition(partition_name=partition_name)
@@ -77,7 +87,7 @@ class SummaryProcessor:
                 summary=summary,
                 file_id=file_id,
                 file_name=file_name,
-                source_id=source_id or file_id,
+                source_id=source_id,
                 file_type=file_type,
                 partition_name=partition_name,
                 num_pages=len(content),
@@ -87,6 +97,11 @@ class SummaryProcessor:
             return True, f"Summary for {file_name} generated and uploaded successfully"
 
         except Exception as e:
+            # Get file_name from metadata if available for error message
+            try:
+                file_name = document_data.metadata.file_name if hasattr(document_data, 'metadata') else "unknown"
+            except:
+                file_name = "unknown"
             error_msg = f"Error processing summary for {file_name}: {str(e)}"
             return False, error_msg
 
@@ -159,10 +174,8 @@ class SummaryProcessor:
         # Generate embedding for summary
         embedding = self.generate_embeddings_func(cleaned_summary)
         if isinstance(embedding, tuple):
-            embedding, token_count = embedding
-            tokens = [str(token_count)]
-        else:
-            tokens = [""]
+            # If it returns (embedding, token_count), extract just the embedding
+            embedding, _ = embedding
         embeddings = [embedding]
 
         # Prepare metadata for summary
@@ -180,7 +193,6 @@ class SummaryProcessor:
         self.milvus_client.insert_documents(
             texts=[cleaned_summary],
             embeddings=embeddings,
-            tokens=tokens,
             metadata=metadata_summary,
             partition_name=partition_name
         )
@@ -212,11 +224,10 @@ class SummaryProcessor:
             Dict: Prepared metadata.
         """
         return {
-            "source_id": source_id,
             "file_id": file_id,
             "file_name": file_name,
             "type_file": file_type,
-            "pages": [str(p) for p in pages],
-            "num_image": str(num_images),
+            "total_pages": str(num_pages),
+            "total_chapters": "",
+            "total_num_image": str(num_images),
         }
-

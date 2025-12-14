@@ -34,6 +34,7 @@ class DocumentUploader:
         self,
         *,
         document_data: ExtractionResult,
+        file_id: str,
         process_images: bool = False,
         partition_name: str
     ) -> Tuple[bool, str]:
@@ -44,10 +45,8 @@ class DocumentUploader:
             document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData), 
                           and 'metadata' (BaseFileMetadata or subclass).
             file_id: Unique file ID.
-            file_name: File name (optional, will use metadata.file_name if available, else file_id).
-            source_id: Source ID (optional, uses file_id if not provided).
-            file_type: File type (optional, will use metadata.file_type if available, else 'document').
             process_images: Whether to process and vectorize images (default False).
+            partition_name: Partition name for Milvus.
 
         Returns:
             Tuple[bool, str]: (success, message).
@@ -62,7 +61,7 @@ class DocumentUploader:
 
             content = document_data.content
             images = document_data.images or []
-            metadata = document_data.metadata
+            metadata_obj = document_data.metadata
 
             if not content:
                 raise ValueError("document_data must contain 'content' with at least one element")
@@ -70,16 +69,21 @@ class DocumentUploader:
             if not isinstance(content, list):
                 raise ValueError("'content' must be a list of texts")
 
+            # Get file_name and file_type from metadata
+            file_name = metadata_obj.file_name
+            file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
+            source_id = file_id  # Use file_id as source_id
+
             self.milvus_client.create_partition(partition_name=partition_name)
 
             # Process texts
-            texts, embeddings, tokens = self._process_texts(content=content)
+            texts, embeddings = self._process_texts(content=content)
 
             # Prepare metadata
             metadata = self._prepare_metadata(
                 file_id=file_id,
                 file_name=file_name,
-                source_id=source_id or file_id,
+                source_id=source_id,
                 file_type=file_type,
                 num_pages=len(content),
                 num_images=len(images),
@@ -90,7 +94,6 @@ class DocumentUploader:
             self.milvus_client.insert_documents(
                 texts=texts,
                 embeddings=embeddings,
-                tokens=tokens,
                 metadata=metadata,
                 partition_name=partition_name
             )
@@ -108,6 +111,7 @@ class DocumentUploader:
                     images=images_dict,  # Pass as dicts for processing
                     file_id=file_id,
                     file_name=file_name,
+                    source_id=source_id,
                     file_type=file_type,
                     partition_name=partition_name
                 )
@@ -126,7 +130,7 @@ class DocumentUploader:
         self,
         *,
         content: List[str]
-    ) -> Tuple[List[str], List[List[float]], List[str]]:
+    ) -> Tuple[List[str], List[List[float]]]:
         """
         Processes texts and generates embeddings.
 
@@ -134,11 +138,10 @@ class DocumentUploader:
             content: List of texts.
 
         Returns:
-            Tuple[List[str], List[List[float]], List[str]]: (texts, embeddings, tokens).
+            Tuple[List[str], List[List[float]]]: (texts, embeddings).
         """
         texts = []
         embeddings = []
-        tokens = []
 
         for text in content:
             if not text or not isinstance(text, str):
@@ -154,14 +157,11 @@ class DocumentUploader:
             # Generate embedding
             embedding = self.generate_embeddings_func(cleaned_text)
             if isinstance(embedding, tuple):
-                # If it returns (embedding, tokens)
-                embedding, token_count = embedding
-                tokens.append(str(token_count))
-            else:
-                tokens.append("")
+                # If it returns (embedding, token_count), extract just the embedding
+                embedding, _ = embedding
             embeddings.append(embedding)
 
-        return texts, embeddings, tokens
+        return texts, embeddings
 
     def _process_images(
         self,
@@ -189,7 +189,6 @@ class DocumentUploader:
 
         image_texts = []
         image_embeddings = []
-        image_tokens = []
 
         for image in images:
             # Images are validated before calling this method, so we know they have the expected structure
@@ -206,10 +205,8 @@ class DocumentUploader:
             # Generate embedding from image description
             embedding = self.generate_embeddings_func(image_description)
             if isinstance(embedding, tuple):
-                embedding, token_count = embedding
-                image_tokens.append(str(token_count))
-            else:
-                image_tokens.append("")
+                # If it returns (embedding, token_count), extract just the embedding
+                embedding, _ = embedding
             image_embeddings.append(embedding)
 
         # Prepare metadata for images
@@ -227,7 +224,6 @@ class DocumentUploader:
         self.milvus_client.insert_documents(
             texts=image_texts,
             embeddings=image_embeddings,
-            tokens=image_tokens,
             metadata=metadata,
             partition_name=partition_name
         )
@@ -259,11 +255,12 @@ class DocumentUploader:
             Dict: Prepared metadata.
         """
         return {
-            "source_id": source_id,
             "file_id": file_id,
             "file_name": file_name,
             "type_file": file_type,
             "pages": [str(p) for p in pages],
-            "num_image": str(num_images),
+            "chapters": "",
+            "image_number": "",
+            "image_number_in_page": "",
         }
 

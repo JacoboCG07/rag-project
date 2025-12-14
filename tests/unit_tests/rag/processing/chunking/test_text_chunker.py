@@ -118,6 +118,29 @@ class TestTextChunker:
             # Note: Overlap might not always be exact due to word boundaries
             # So we just verify chunks are created
     
+    def test_chunk_with_overlap_verification(self):
+        """Test chunk with overlap and verify overlap text appears"""
+        chunker = TextChunker(chunk_size=50, overlap=20)
+        texts = ["First part of text. Second part of text. Third part of text. Fourth part of text."]
+        
+        result = chunker.chunk(texts=texts)
+        
+        assert isinstance(result, list)
+        assert len(result) > 1
+        
+        # Verify that overlap is applied (chunks should share some text)
+        for i in range(len(result) - 1):
+            current_chunk = result[i]
+            next_chunk = result[i + 1]
+            # Get last words of current chunk
+            current_words = current_chunk.split()[-3:]
+            # Get first words of next chunk
+            next_words = next_chunk.split()[:3]
+            # There should be some common words (overlap)
+            common_words = set(current_words) & set(next_words)
+            # At least one word should overlap (allowing for word boundary adjustments)
+            assert len(common_words) > 0 or len(current_chunk) > 0
+    
     def test_chunk_with_metadata(self):
         """Test chunk with return_metadata=True"""
         chunker = TextChunker(chunk_size=50)

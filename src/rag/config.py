@@ -2,8 +2,8 @@
 Configuration classes for RAG Pipeline
 Uses Pydantic for type validation and configuration management
 """
-from typing import Optional, Callable, Any, List
-from pydantic import BaseModel, Field
+from typing import Optional, Callable, Any, List, Tuple
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 import os
 from dotenv import load_dotenv
 
@@ -28,26 +28,44 @@ class MilvusConfig(BaseModel):
 class RAGPipelineConfig(BaseModel):
     """Configuration for RAG Pipeline (document processing)"""
     
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     milvus: MilvusConfig = Field(default_factory=MilvusConfig)
     collection_name_documents: str = os.getenv("MILVUS_COLLECTION_NAME_DOCUMENTS", "documents")
     collection_name_summaries: str = os.getenv("MILVUS_COLLECTION_NAME_SUMMARIES", "summaries")
     
     # Chunking configuration
     chunk_size: int = Field(default=2000, ge=100, le=10_000, description="Maximum size of each chunk in characters")
-    chunk_overlap: int = Field(default=200, ge=10, le=1000, description="Number of characters to overlap between chunks")
+    chunk_overlap: int = Field(default=0, ge=10, le=1000, description="Number of characters to overlap between chunks")
     detect_chapters: bool = Field(default=True, description="Whether to detect chapters in documents")
     
     # Processing options
     extract_images: bool = Field(default=False, description="Whether to extract and process images from PDFs")
     
-    # Functions (will be set separately, not in config)
-    embedder = OpenAIEmbedder(model="text-embedding-ada-002", count_tokens=False)
-    generate_embeddings_func = embedder.generate_embedding
-
-    # Embedding dimensions
-    embedding_dim = embedder.get_dimensions()
+    # Embedding configuration
+    embedder: OpenAIEmbedder = Field(default_factory=lambda: OpenAIEmbedder(model="text-embedding-ada-002", count_tokens=False))
+    generate_embeddings_func: Optional[Callable[[str], Tuple[List[float], Optional[int]]]] = Field(default=None, exclude=True)
+    embedding_dim: int = Field(default=1536)  # Default for text-embedding-ada-002
 
     # Summary configuration
-    text_model = OpenAITextModel(model="gpt-4o")
-    summarizer = LLMSummarizer(text_model=text_model, max_tokens=1_500, temperature=0.3)
-    generate_summary_func = summarizer.generate_summary
+    text_model: OpenAITextModel = Field(default_factory=lambda: OpenAITextModel(model="gpt-4o"))
+    summarizer: Optional[LLMSummarizer] = Field(default=None)
+    generate_summary_func: Optional[Callable[[str], str]] = Field(default=None, exclude=True)
+    
+    @model_validator(mode='after')
+    def initialize_functions(self):
+        """Initialize functions after model creation"""
+        # Set functions after initialization
+        if self.generate_embeddings_func is None:
+            # Create a wrapper function that accepts positional arguments
+            # since generate_embedding requires keyword-only arguments
+            def embedding_wrapper(text: str) -> Tuple[List[float], Optional[int]]:
+                return self.embedder.generate_embedding(text=text)
+            self.generate_embeddings_func = embedding_wrapper
+        if self.summarizer is None:
+            self.summarizer = LLMSummarizer(text_model=self.text_model, max_tokens=1_500, temperature=0.3)
+        if self.generate_summary_func is None:
+            self.generate_summary_func = self.summarizer.generate_summary
+        if self.embedding_dim == 1536:  # Only update if still default
+            self.embedding_dim = self.embedder.get_dimensions()
+        return self

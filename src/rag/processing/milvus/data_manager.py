@@ -21,7 +21,6 @@ class DataManager:
         *,
         texts: List[str],
         embeddings: List[List[float]],
-        tokens: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -30,7 +29,6 @@ class DataManager:
         Args:
             texts: List of texts to insert.
             embeddings: List of corresponding embeddings.
-            tokens: List of tokens (optional).
             metadata: Additional metadata (optional).
 
         Returns:
@@ -53,10 +51,6 @@ class DataManager:
                 data = {
                     "text": text,
                     "text_embedding": embedding,
-                    "tokens": tokens[i] if tokens and i < len(tokens) else "",
-                    "image_embedding": "",
-                    "audio_embedding": "",
-                    "date": current_date,
                 }
 
                 # Add metadata

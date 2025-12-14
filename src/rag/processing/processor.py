@@ -93,7 +93,7 @@ class DocumentProcessor:
     def process_and_insert(
         self,
         *,
-        file_name: str,
+        file_id: str,
         document_data: ExtractionResult,
         process_images: bool = False,
         partition_name: str
@@ -103,14 +103,11 @@ class DocumentProcessor:
         Always inserts full documents, optionally processes images and generates summaries.
 
         Args:
+            file_id: Unique file ID.
             document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData),
                           and 'metadata' (BaseFileMetadata or subclass).
-            file_id: Unique file ID.
-            file_name: File name (optional, will use metadata.file_name if available).
-            source_id: Source ID (optional, uses file_id if not provided).
-            file_type: File type (optional, will use metadata.file_type if available, else 'document').
             process_images: Whether to process and vectorize images (default False).
-            generate_summary: Whether to generate and insert a summary (default False).
+            partition_name: Partition name for Milvus.
 
         Returns:
             Tuple[bool, str]: (success, message).
@@ -119,26 +116,38 @@ class DocumentProcessor:
             ValueError: If document_data doesn't have the expected format or parameters are invalid.
         """
         try:
+            # Get file_name from metadata for error messages
+            file_name = document_data.metadata.file_name if hasattr(document_data, 'metadata') else "unknown"
 
             success_doc, message_doc = self._document_uploader.upload_document(
                 document_data=document_data,
+                file_id=file_id,
                 process_images=process_images,
                 partition_name=partition_name
             )
 
             if not success_doc: return False, message_doc
 
-            success_summary, message_summary = self._summary_processor.process_and_upload_summary(
-                document_data=document_data,
-                partition_name=partition_name
-            )
+            if self._summary_processor:
+                success_summary, message_summary = self._summary_processor.process_and_upload_summary(
+                    document_data=document_data,
+                    file_id=file_id,
+                    partition_name=partition_name
+                )
 
-            if not success_summary:  return False, f"{message_doc}, but summary failed: {message_summary}"
+                if not success_summary:  return False, f"{message_doc}, but summary failed: {message_summary}"
 
-            return True, f"{message_doc}, {message_summary}"
+                return True, f"{message_doc}, {message_summary}"
+            else:
+                return True, message_doc
 
 
         except Exception as e:
+            # Get file_name from metadata if available for error message
+            try:
+                file_name = document_data.metadata.file_name if hasattr(document_data, 'metadata') else "unknown"
+            except:
+                file_name = "unknown"
             error_msg = f"Error processing document {file_name}: {str(e)}"
             return False, error_msg
 

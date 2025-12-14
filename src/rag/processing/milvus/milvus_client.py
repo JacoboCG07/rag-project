@@ -103,7 +103,6 @@ class MilvusClient:
         *,
         texts: List[str],
         embeddings: List[List[float]],
-        tokens: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         partition_name: Optional[str] = None
     ) -> None:
@@ -113,14 +112,12 @@ class MilvusClient:
         Args:
             texts: List of texts to insert.
             embeddings: List of corresponding embeddings.
-            tokens: List of tokens (optional).
             metadata: Additional metadata (optional).
             partition_name: Partition name (optional).
         """
         data = self._data_manager.prepare_data_for_insertion(
             texts=texts,
             embeddings=embeddings,
-            tokens=tokens,
             metadata=metadata
         )
 

@@ -5,6 +5,7 @@ Uses text models to generate document summaries
 
 from typing import Optional
 from llms.text import BaseTextModel, OpenAITextModel
+from src.utils.utils import PromptLoader
 
 
 class LLMSummarizer:
@@ -70,7 +71,7 @@ class LLMSummarizer:
             raise ValueError("Text cannot be empty after stripping")
 
         # Build prompt using template
-        prompt, system_prompt = self._get_summary_prompt()
+        prompt, system_prompt = self._get_summary_prompt(text)
 
         # Generate summary using text model
         try:
@@ -85,13 +86,17 @@ class LLMSummarizer:
             raise Exception(f"Error generating summary: {str(e)}") from e
 
     @staticmethod
-    def _get_summary_prompt() -> str:
+    def _get_summary_prompt(text: str) -> str:
         """
         Returns the default prompt template for summarization.
+
+        Args:
+            text: Full text content to summarize.
 
         Returns:
             str: Default prompt template.
         """
-        
-        return user_prompt, system_prompt
+
+        system_prompt = PromptLoader.read_file("src/rag/processing/summarizer/summarizer_prompt.md")
+        return text, system_prompt
 
