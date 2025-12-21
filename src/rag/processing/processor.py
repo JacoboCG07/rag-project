@@ -22,6 +22,7 @@ class DocumentProcessor:
         collection_name_summaries: str,
         generate_embeddings_func: Callable[[str], Any],
         generate_summary_func: Callable[[str], str] = None,
+        describe_image_func: Callable[[str], str] = None,
         alias: str = "default",
         embedding_dim: int = 1536,
         uri: Optional[str] = None,
@@ -38,6 +39,7 @@ class DocumentProcessor:
             collection_name_summaries: Collection name for document summaries.
             generate_embeddings_func: Function to generate embeddings (must receive text and return embedding).
             generate_summary_func: Function to generate summary (must receive full text and return summary string). Optional.
+            describe_image_func: Function to describe image (must receive base64 image and return description string). Optional.
             alias: Connection alias.
             embedding_dim: Embedding vector dimension.
             uri: Connection URI (optional).
@@ -73,11 +75,13 @@ class DocumentProcessor:
         # Store embedding and summary generation functions
         self.generate_embeddings_func = generate_embeddings_func
         self.generate_summary_func = generate_summary_func
+        self.describe_image_func = describe_image_func
 
-        # Initialize DocumentUploader with embedding function
+        # Initialize DocumentUploader with embedding function and image description function
         self._document_uploader = DocumentUploader(
             milvus_client=self.milvus_client_documents,
-            generate_embeddings_func=generate_embeddings_func
+            generate_embeddings_func=generate_embeddings_func,
+            describe_image_func=describe_image_func
         )
         
         # Initialize SummaryProcessor only if generate_summary_func is provided

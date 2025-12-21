@@ -18,7 +18,8 @@ class DocumentUploader:
         self,
         *,
         milvus_client: MilvusClient,
-        generate_embeddings_func: Callable[[str], Any]
+        generate_embeddings_func: Callable[[str], Any],
+        describe_image_func: Optional[Callable[[str], str]] = None
     ):
         """
         Initializes the document uploader.
@@ -26,9 +27,11 @@ class DocumentUploader:
         Args:
             milvus_client: Milvus client for documents collection.
             generate_embeddings_func: Function to generate embeddings (must receive text and return embedding).
+            describe_image_func: Function to describe image (must receive base64 image and return description string). Optional.
         """
         self.milvus_client = milvus_client
         self.generate_embeddings_func = generate_embeddings_func
+        self.describe_image_func = describe_image_func
 
     def upload_document(
         self,
@@ -192,14 +195,23 @@ class DocumentUploader:
 
         for image in images:
             # Images are validated before calling this method, so we know they have the expected structure
-            # Create description from image metadata (page, image_number_in_page, etc.)
-            # Format: "Image {image_number} (page {page}, image {image_number_in_page}) from {file_name}"
             page = image.get('page', 0)
             image_num_in_page = image.get('image_number_in_page', 0)
             image_num = image.get('image_number', 0)
+            image_base64 = image.get('image_base64', '')
             
-            image_description = f"Image {image_num} (page {page}, image {image_num_in_page}) from {file_name}"
+            # Only process image if we have describe_image_func and image_base64
+            if not self.describe_image_func or not image_base64:
+                # Skip this image if we can't describe it
+                continue
             
+            # Try to describe the image using LLM
+            try:
+                image_description = self.describe_image_func(image=image_base64)
+            except Exception as e:
+                # If description fails, skip this image and continue with the next one
+                continue
+
             image_texts.append(image_description)
 
             # Generate embedding from image description

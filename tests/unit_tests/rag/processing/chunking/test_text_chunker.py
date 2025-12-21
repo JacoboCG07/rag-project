@@ -325,4 +325,3 @@ class TestTextChunker:
         
         line = "   "
         assert TextChunker._is_chapter_start(line=line) is False
-

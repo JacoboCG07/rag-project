@@ -5,6 +5,7 @@ Single responsibility: collection, partition and index management
 
 from typing import Optional
 from pymilvus import Collection, utility
+from pymilvus.exceptions import ConnectionNotExistException
 
 from .exceptions import MilvusCollectionError
 from .schemas import Schemas, SchemaNotFoundError
@@ -160,6 +161,10 @@ class CollectionManager:
         """
         try:
             collection.release()
+        except ConnectionNotExistException:
+            # Connection already closed, collection release is not needed
+            # This is not an error, just skip silently
+            pass
         except Exception as e:
             raise MilvusCollectionError(
                 f"Error releasing collection: {str(e)}"

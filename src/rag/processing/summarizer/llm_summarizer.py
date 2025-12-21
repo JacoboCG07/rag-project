@@ -17,7 +17,7 @@ class LLMSummarizer:
     def __init__(
         self,
         *,
-        text_model: [BaseTextModel] = None,
+        text_model: Optional[BaseTextModel] = None,
         max_tokens: int = 1_000,
         temperature: float = 0.3
     ):
@@ -25,18 +25,12 @@ class LLMSummarizer:
         Initializes the LLM summarizer.
 
         Args:
-            text_model: Optional BaseTextModel instance to use.
-                       If None, creates an OpenAITextModel with provided parameters.
-            api_key: API key for the text model (only used if text_model is None).
-            model: Model name to use (only used if text_model is None, default 'gpt-4o').
-            max_tokens: Maximum tokens for the summary (default 500).
+            text_model: BaseTextModel instance to use. Must be provided.
+            max_tokens: Maximum tokens for the summary (default 1000).
             temperature: Temperature for generation (default 0.3, lower for more focused summaries).
-            prompt_template: Optional custom prompt template.
-                           If None, uses default template.
-                           Template should contain {text} placeholder for the document text.
 
         Raises:
-            ValueError: If both text_model and api_key are None.
+            ValueError: If text_model is not provided or is not an instance of BaseTextModel.
         """
         if not isinstance(text_model, BaseTextModel):
             raise ValueError(

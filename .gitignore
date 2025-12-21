@@ -4,8 +4,5 @@ volumes/
 # Python
 __pycache__/
 
-# Environment variables
-.env.local
-.env.local2
 # Carpeta
 ww

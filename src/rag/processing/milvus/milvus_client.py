@@ -4,7 +4,8 @@ Implements Facade pattern to simplify usage
 """
 
 from typing import Optional, List, Dict, Any
-from pymilvus import Collection
+from pymilvus import Collection, connections
+from pymilvus.exceptions import ConnectionNotExistException
 
 from .connection_manager import ConnectionManager
 from .collection_manager import CollectionManager
@@ -130,9 +131,25 @@ class MilvusClient:
 
     def close(self) -> None:
         """Closes connection and releases resources."""
+        # Try to release collection only if connection exists
         if self._collection:
-            self._collection_manager.release_collection(collection=self._collection)
-        self._connection_manager.disconnect(alias=self.alias)
+            try:
+                # Check if connection exists before releasing collection
+                if connections.has_connection(self.alias):
+                    self._collection_manager.release_collection(collection=self._collection)
+            except ConnectionNotExistException:
+                # Connection already closed, skip collection release
+                pass
+            except Exception:
+                # Other errors during release are not critical, continue with disconnect
+                pass
+        
+        # Disconnect connection (this handles the case where connection doesn't exist)
+        try:
+            self._connection_manager.disconnect(alias=self.alias)
+        except Exception:
+            # Connection may already be closed, ignore error
+            pass
 
     def __enter__(self):
         """Context manager entry."""

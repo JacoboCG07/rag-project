@@ -7,6 +7,7 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 from pymilvus import connections, db
+from pymilvus.exceptions import ConnectionNotExistException
 
 from .exceptions import MilvusConnectionError
 
@@ -88,6 +89,9 @@ class ConnectionManager:
         try:
             if connections.has_connection(alias):
                 connections.disconnect(alias=alias)
+        except ConnectionNotExistException:
+            # Connection already closed, this is not an error
+            pass
         except Exception as e:
             raise MilvusConnectionError(
                 f"Error closing connection {alias}: {str(e)}"

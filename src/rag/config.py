@@ -7,9 +7,10 @@ from pydantic import BaseModel, Field, model_validator, ConfigDict
 import os
 from dotenv import load_dotenv
 
-from llms import OpenAITextModel
+from llms import OpenAITextModel, OpenAIVisionModel
 from rag.processing.embeddings.openai_embedder import OpenAIEmbedder
 from rag.processing.summarizer.llm_summarizer import LLMSummarizer
+from rag.processing.describer.llm_image_describer import LLMImageDescriber
 
 load_dotenv()
 
@@ -52,6 +53,11 @@ class RAGPipelineConfig(BaseModel):
     summarizer: Optional[LLMSummarizer] = Field(default=None)
     generate_summary_func: Optional[Callable[[str], str]] = Field(default=None, exclude=True)
     
+    # Image description configuration
+    vision_model: OpenAIVisionModel = Field(default_factory=lambda: OpenAIVisionModel(model="gpt-4o"))
+    image_describer: Optional[LLMImageDescriber] = Field(default=None)
+    describe_image_func: Optional[Callable[..., str]] = Field(default=None, exclude=True)
+    
     @model_validator(mode='after')
     def initialize_functions(self):
         """Initialize functions after model creation"""
@@ -66,6 +72,10 @@ class RAGPipelineConfig(BaseModel):
             self.summarizer = LLMSummarizer(text_model=self.text_model, max_tokens=1_500, temperature=0.3)
         if self.generate_summary_func is None:
             self.generate_summary_func = self.summarizer.generate_summary
+        if self.image_describer is None:
+            self.image_describer = LLMImageDescriber(vision_model=self.vision_model, max_tokens=1_000, temperature=0.3)
+        if self.describe_image_func is None:
+            self.describe_image_func = self.image_describer.describe_image
         if self.embedding_dim == 1536:  # Only update if still default
             self.embedding_dim = self.embedder.get_dimensions()
         return self

@@ -2,6 +2,8 @@
 Script simple para probar la inserción de datos en RAG Pipeline
 """
 import sys
+import os
+import uuid
 from pathlib import Path
 
 # Agregar src al path
@@ -55,12 +57,18 @@ def main():
     print(f"\n3. Procesando archivo: {test_file.name}")
     print(f"   Ruta: {test_file}")
     
+    # Generar job_id único para este test
+    # job_id = str(uuid.uuid4())
+    job_id = "test_job_id"
+    print(f"   Job ID: {job_id}")
+    
     # 4. Procesar archivo
     try:
         success, message, info = pipeline.process_single_file(
             file_path=str(test_file),
             extract_process_images=False,
-            partition_name="test_partition"
+            partition_name="test_partition",
+            job_id=job_id
         )
         
         # 5. Mostrar resultados
@@ -70,6 +78,7 @@ def main():
         print(f"[OK] Exito: {success}")
         print(f"[OK] Mensaje: {message}")
         print(f"\n[OK] Informacion del archivo:")
+        print(f"   - Job ID: {job_id}")
         print(f"   - File ID: {info['file_id']}")
         print(f"   - File Name: {info['file_name']}")
         print(f"   - File Path: {info['file_path']}")
@@ -100,10 +109,12 @@ def main():
 
 if __name__ == "__main__":
     # Verificar variables de entorno
-    import os
     from dotenv import load_dotenv
     
     load_dotenv()
+    
+    # Deshabilitar MongoDB logging para tests (opcional, comentar si quieres logs en MongoDB)
+    os.environ["DISABLE_MONGODB_LOGGING"] = "true"
     
     print("\nVerificando configuración...")
     if not os.getenv("OPENAI_API_KEY"):
@@ -116,6 +127,9 @@ if __name__ == "__main__":
         print("[INFO] Usando configuracion por defecto de Milvus (localhost:19530)")
     else:
         print(f"[OK] MILVUS_HOST: {os.getenv('MILVUS_HOST')}")
+    
+    if os.getenv("DISABLE_MONGODB_LOGGING", "false").lower() == "true":
+        print("[INFO] MongoDB logging deshabilitado para este test")
     
     print()
     
