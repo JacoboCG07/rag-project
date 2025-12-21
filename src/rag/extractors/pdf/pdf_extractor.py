@@ -10,6 +10,7 @@ from ..base import (
     PDFFileMetadata,
     ExtractionResult
 )
+from src.utils import get_logger
 
 
 class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
@@ -23,6 +24,11 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             file_path: Path to the PDF file
         """
         super().__init__(file_path)
+        self.logger = get_logger(__name__)
+        self.logger.debug(
+            "Initializing PDFExtractor",
+            extra={"file_path": str(self.file_path)}
+        )
     
     def get_metadata(self) -> PDFFileMetadata:
         """
@@ -34,19 +40,36 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
         base_metadata = super().get_metadata()
         
         try:
+            self.logger.debug(f"Getting PDF metadata: {self.file_name}")
             doc = fitz.open(self.file_path)
             total_pages = len(doc)
             total_images = self._count_images(doc)
             doc.close()
             
-            return PDFFileMetadata(
+            metadata = PDFFileMetadata(
                 file_name=base_metadata.file_name,
                 file_type=base_metadata.file_type,
                 total_pages=total_pages,
                 total_images=total_images
             )
             
+            self.logger.debug(
+                "PDF metadata retrieved",
+                extra={
+                    "file_name": metadata.file_name,
+                    "total_pages": total_pages,
+                    "total_images": total_images
+                }
+            )
+            
+            return metadata
+            
         except Exception as e:
+            self.logger.error(
+                f"Error getting PDF metadata: {str(e)}",
+                extra={"file_path": str(self.file_path)},
+                exc_info=True
+            )
             raise Exception(f"Error getting PDF metadata: {str(e)}")
     
     def _count_images(self, doc) -> int:
@@ -77,6 +100,15 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             ExtractionResult with extracted content, images, and metadata
         """
         try:
+            self.logger.info(
+                "Starting PDF extraction",
+                extra={
+                    "file_path": str(self.file_path),
+                    "file_name": self.file_name,
+                    "extract_images": extract_images
+                }
+            )
+            
             # Extract text
             text_pages = self._extract_text_from_pdf()
             
@@ -89,13 +121,35 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             # Get metadata
             metadata = self.get_metadata()
             
-            return ExtractionResult[PDFFileMetadata](
+            result = ExtractionResult[PDFFileMetadata](
                 content=text_pages,
                 images=images,
                 metadata=metadata
             )
             
+            self.logger.info(
+                "PDF extraction completed successfully",
+                extra={
+                    "file_path": str(self.file_path),
+                    "file_name": self.file_name,
+                    "pages_extracted": len(text_pages),
+                    "images_extracted": len(images) if images else 0,
+                    "extract_images": extract_images
+                }
+            )
+            
+            return result
+            
         except Exception as e:
+            self.logger.error(
+                f"Error extracting PDF content: {str(e)}",
+                extra={
+                    "file_path": str(self.file_path),
+                    "file_name": self.file_name,
+                    "extract_images": extract_images
+                },
+                exc_info=True
+            )
             raise Exception(f"Error extracting content from PDF {self.file_name}: {str(e)}")
     
     def _extract_text_from_pdf(self) -> List[str]:
@@ -106,18 +160,35 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             List of strings, one per page
         """
         try:
+            self.logger.debug(f"Extracting text from PDF: {self.file_name}")
             text_pages = []
             doc = fitz.open(self.file_path)
+            total_pages = len(doc)
             
-            for page_num in range(len(doc)):
+            for page_num in range(total_pages):
                 page = doc[page_num]
                 text = page.get_text()
                 text_pages.append(text)
             
             doc.close()
+            
+            self.logger.debug(
+                "Text extraction from PDF completed",
+                extra={
+                    "file_name": self.file_name,
+                    "pages_extracted": len(text_pages),
+                    "total_pages": total_pages
+                }
+            )
+            
             return text_pages
             
         except Exception as e:
+            self.logger.error(
+                f"Error extracting text from PDF: {str(e)}",
+                extra={"file_path": str(self.file_path)},
+                exc_info=True
+            )
             raise Exception(f"Error extracting text from PDF: {str(e)}")
     
     def _extract_images_from_pdf(self) -> List[ImageData]:
@@ -128,11 +199,13 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             List of ImageData objects with image information
         """
         try:
+            self.logger.debug(f"Extracting images from PDF: {self.file_name}")
             images: List[ImageData] = []
             doc = fitz.open(self.file_path)
             total_image_counter = 0  # Counter for total images in the document
+            total_pages = len(doc)
             
-            for page_num in range(len(doc)):
+            for page_num in range(total_pages):
                 page = doc[page_num]
                 image_list = page.get_images()
                 
@@ -160,8 +233,23 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                     ))
             
             doc.close()
+            
+            self.logger.debug(
+                "Image extraction from PDF completed",
+                extra={
+                    "file_name": self.file_name,
+                    "images_extracted": len(images),
+                    "total_pages": total_pages
+                }
+            )
+            
             return images
             
         except Exception as e:
+            self.logger.error(
+                f"Error extracting images from PDF: {str(e)}",
+                extra={"file_path": str(self.file_path)},
+                exc_info=True
+            )
             raise Exception(f"Error extracting images from PDF: {str(e)}")
 

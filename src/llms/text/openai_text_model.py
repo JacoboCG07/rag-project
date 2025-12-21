@@ -13,6 +13,7 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 from .base_text_model import BaseTextModel
+from src.utils import get_logger
 
 
 class OpenAITextModel(BaseTextModel):
@@ -57,6 +58,16 @@ class OpenAITextModel(BaseTextModel):
         self.default_max_tokens = max_tokens
         self.default_temperature = temperature
         self.client = OpenAI(api_key=self.api_key)
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing OpenAITextModel",
+            extra={
+                "model": model,
+                "default_max_tokens": max_tokens,
+                "default_temperature": temperature
+            }
+        )
 
     def call_text_model(
         self,
@@ -91,9 +102,21 @@ class OpenAITextModel(BaseTextModel):
         """
         # Validate input
         if not messages and (not prompt or not isinstance(prompt, str) or not prompt.strip()):
+            self.logger.error("Either 'prompt' or 'messages' must be provided and non-empty")
             raise ValueError("Either 'prompt' or 'messages' must be provided and non-empty")
 
         try:
+            self.logger.debug(
+                "Calling OpenAI Text API",
+                extra={
+                    "model": self.model,
+                    "has_prompt": bool(prompt),
+                    "has_messages": bool(messages),
+                    "has_system_prompt": bool(system_prompt),
+                    "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
+                    "temperature": temperature if temperature is not None else self.default_temperature
+                }
+            )
             # Build messages list
             messages_list = []
 
@@ -136,10 +159,52 @@ class OpenAITextModel(BaseTextModel):
 
             result = response.choices[0].message.content
             if not result:
+                self.logger.error("OpenAI Text API returned an empty response")
                 raise Exception("OpenAI Text API returned an empty response.")
+
+            # Log usage information if available
+            usage_info = {}
+            if hasattr(response, 'usage'):
+                usage = response.usage
+                if hasattr(usage, 'prompt_tokens'):
+                    usage_info['prompt_tokens'] = usage.prompt_tokens
+                if hasattr(usage, 'completion_tokens'):
+                    usage_info['completion_tokens'] = usage.completion_tokens
+                if hasattr(usage, 'total_tokens'):
+                    usage_info['total_tokens'] = usage.total_tokens
+
+            self.logger.info(
+                "OpenAI Text API call completed successfully",
+                extra={
+                    "model": self.model,
+                    "response_length": len(result),
+                    **usage_info
+                }
+            )
 
             return result.strip()
 
         except Exception as e:
+            error_msg = str(e)
+            # Check for rate limit errors
+            is_rate_limit = "429" in error_msg or "rate_limit" in error_msg.lower() or "Too Many Requests" in error_msg
+            
+            if is_rate_limit:
+                self.logger.warning(
+                    f"Rate limit error calling OpenAI Text API: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "error_type": "rate_limit"
+                    }
+                )
+            else:
+                self.logger.error(
+                    f"Error calling OpenAI Text API: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
             raise Exception(f"Error calling OpenAI Text API: {str(e)}") from e
 

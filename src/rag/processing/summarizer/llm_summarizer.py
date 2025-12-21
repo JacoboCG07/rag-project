@@ -6,6 +6,7 @@ Uses text models to generate document summaries
 from typing import Optional
 from llms.text import BaseTextModel, OpenAITextModel
 from src.utils.utils import PromptLoader
+from src.utils import get_logger
 
 
 class LLMSummarizer:
@@ -42,6 +43,16 @@ class LLMSummarizer:
         self.text_model: BaseTextModel = text_model
         self.max_tokens: int = max_tokens
         self.temperature: float = temperature
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing LLMSummarizer",
+            extra={
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "text_model_type": type(text_model).__name__
+            }
+        )
 
     def generate_summary(self, text: str) -> str:
         """
@@ -58,11 +69,22 @@ class LLMSummarizer:
             Exception: If summarization fails.
         """
         if not text or not isinstance(text, str):
+            self.logger.error("Text must be a non-empty string")
             raise ValueError("Text must be a non-empty string")
 
         text = text.strip()
         if not text:
+            self.logger.error("Text cannot be empty after stripping")
             raise ValueError("Text cannot be empty after stripping")
+
+        self.logger.debug(
+            "Starting summary generation",
+            extra={
+                "text_length": len(text),
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature
+            }
+        )
 
         # Build prompt using template
         prompt, system_prompt = self._get_summary_prompt(text)
@@ -75,8 +97,25 @@ class LLMSummarizer:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
             )
+            
+            self.logger.info(
+                "Summary generated successfully",
+                extra={
+                    "original_text_length": len(text),
+                    "summary_length": len(summary.strip())
+                }
+            )
+            
             return summary.strip()
         except Exception as e:
+            self.logger.error(
+                f"Error generating summary: {str(e)}",
+                extra={
+                    "text_length": len(text),
+                    "error_type": type(e).__name__
+                },
+                exc_info=True
+            )
             raise Exception(f"Error generating summary: {str(e)}") from e
 
     @staticmethod

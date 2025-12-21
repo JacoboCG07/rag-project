@@ -6,6 +6,7 @@ Uses vision models to generate image descriptions
 from typing import Optional, Union, List
 from llms.vision import BaseVisionModel
 from src.utils.utils import PromptLoader
+from src.utils import get_logger
 
 
 class LLMImageDescriber:
@@ -41,6 +42,16 @@ class LLMImageDescriber:
         self.vision_model: BaseVisionModel = vision_model
         self.max_tokens: int = max_tokens
         self.temperature: float = temperature
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing LLMImageDescriber",
+            extra={
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "vision_model_type": type(vision_model).__name__
+            }
+        )
 
     def describe_image(
         self,
@@ -64,6 +75,7 @@ class LLMImageDescriber:
             Exception: If description generation fails.
         """
         if not image:
+            self.logger.error("Image must be provided and non-empty")
             raise ValueError("Image must be provided and non-empty")
 
         # Normalize to list for validation
@@ -73,7 +85,18 @@ class LLMImageDescriber:
             images_list = image
 
         if not images_list or not any(images_list):
+            self.logger.error("Image(s) cannot be empty")
             raise ValueError("Image(s) cannot be empty")
+
+        self.logger.debug(
+            "Starting image description",
+            extra={
+                "images_count": len(images_list),
+                "has_custom_prompt": prompt is not None,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature
+            }
+        )
 
         # Build prompt using template if not provided
         if prompt is None:
@@ -87,8 +110,25 @@ class LLMImageDescriber:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
             )
+            
+            self.logger.info(
+                "Image description generated successfully",
+                extra={
+                    "images_count": len(images_list),
+                    "description_length": len(description.strip())
+                }
+            )
+            
             return description.strip()
         except Exception as e:
+            self.logger.error(
+                f"Error generating image description: {str(e)}",
+                extra={
+                    "images_count": len(images_list),
+                    "error_type": type(e).__name__
+                },
+                exc_info=True
+            )
             raise Exception(f"Error generating image description: {str(e)}") from e
 
     @staticmethod

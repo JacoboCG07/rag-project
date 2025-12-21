@@ -6,6 +6,7 @@ from typing import List
 from ..base import BaseDocumentExtractor
 from ..pdf import PDFExtractor
 from ..txt import TXTExtractor
+from src.utils import get_logger
 
 
 class DocumentExtractorFactory:
@@ -38,12 +39,32 @@ class DocumentExtractorFactory:
         Raises:
             ValueError: If the file type is not supported
         """
+        logger = get_logger(__name__)
         file_extension = Path(file_path).suffix.lower()
         
+        logger.debug(
+            "Creating extractor for file",
+            extra={
+                "file_path": file_path,
+                "file_extension": file_extension
+            }
+        )
+        
         if file_extension == '.pdf':
+            logger.debug("Creating PDFExtractor")
             return PDFExtractor(file_path)
         elif file_extension == '.txt':
+            logger.debug("Creating TXTExtractor")
             return TXTExtractor(file_path)
         else:
-            raise ValueError(f"Unsupported file type: {file_extension}")
+            error_msg = f"Unsupported file type: {file_extension}"
+            logger.error(
+                error_msg,
+                extra={
+                    "file_path": file_path,
+                    "file_extension": file_extension,
+                    "supported_extensions": DocumentExtractorFactory._SUPPORTED_EXTENSIONS
+                }
+            )
+            raise ValueError(error_msg)
 

@@ -11,6 +11,7 @@ from llms import OpenAITextModel, OpenAIVisionModel
 from rag.processing.embeddings.openai_embedder import OpenAIEmbedder
 from rag.processing.summarizer.llm_summarizer import LLMSummarizer
 from rag.processing.describer.llm_image_describer import LLMImageDescriber
+from src.utils import get_logger
 
 load_dotenv()
 
@@ -61,6 +62,10 @@ class RAGPipelineConfig(BaseModel):
     @model_validator(mode='after')
     def initialize_functions(self):
         """Initialize functions after model creation"""
+        logger = get_logger(__name__)
+        
+        logger.debug("Initializing RAGPipelineConfig functions")
+        
         # Set functions after initialization
         if self.generate_embeddings_func is None:
             # Create a wrapper function that accepts positional arguments
@@ -78,4 +83,16 @@ class RAGPipelineConfig(BaseModel):
             self.describe_image_func = self.image_describer.describe_image
         if self.embedding_dim == 1536:  # Only update if still default
             self.embedding_dim = self.embedder.get_dimensions()
+        
+        logger.info(
+            "RAGPipelineConfig initialized successfully",
+            extra={
+                "embedding_dim": self.embedding_dim,
+                "chunk_size": self.chunk_size,
+                "chunk_overlap": self.chunk_overlap,
+                "has_summarizer": self.summarizer is not None,
+                "has_image_describer": self.image_describer is not None
+            }
+        )
+        
         return self

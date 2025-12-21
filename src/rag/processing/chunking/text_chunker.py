@@ -7,6 +7,7 @@ import re
 from typing import List, Tuple, Optional
 
 from .base_chunker import BaseChunker
+from src.utils import get_logger
 
 
 class TextChunker(BaseChunker):
@@ -34,6 +35,16 @@ class TextChunker(BaseChunker):
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.detect_chapters = detect_chapters
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing TextChunker",
+            extra={
+                "chunk_size": chunk_size,
+                "overlap": overlap,
+                "detect_chapters": detect_chapters
+            }
+        )
 
     def chunk(
         self,
@@ -54,7 +65,19 @@ class TextChunker(BaseChunker):
                 where metadata_list contains dicts with 'pages' and optionally 'chapters'.
         """
         if not texts:
+            self.logger.debug("Empty texts list provided, returning empty result")
             return [] if not return_metadata else ([], [])
+
+        self.logger.debug(
+            "Starting text chunking",
+            extra={
+                "input_texts_count": len(texts),
+                "chunk_size": self.chunk_size,
+                "overlap": self.overlap,
+                "detect_chapters": self.detect_chapters,
+                "return_metadata": return_metadata
+            }
+        )
 
         # Step 1: Ensure each text doesn't exceed chunk_size (split if necessary)
         separate_texts, pages = self._ensure_length_segments(texts=texts)
@@ -78,8 +101,24 @@ class TextChunker(BaseChunker):
                     'chapters': chapters[i] if chapters and i < len(chapters) and chapters[i] else ""
                 }
                 metadata_list.append(metadata)
+            
+            self.logger.info(
+                "Text chunking completed with metadata",
+                extra={
+                    "input_texts_count": len(texts),
+                    "chunks_count": len(chunks),
+                    "chapters_detected": sum(1 for c in chapters if c) if chapters else 0
+                }
+            )
             return chunks, metadata_list
 
+        self.logger.info(
+            "Text chunking completed",
+            extra={
+                "input_texts_count": len(texts),
+                "chunks_count": len(chunks)
+            }
+        )
         return chunks
 
     def _ensure_length_segments(
@@ -99,8 +138,10 @@ class TextChunker(BaseChunker):
         """
         result = []
         pages = []
+        split_count = 0
 
         for page, text in enumerate(texts, start=1):
+            original_length = len(text)
             text = text.strip()
 
             while len(text) > self.chunk_size:
@@ -112,10 +153,21 @@ class TextChunker(BaseChunker):
                 result.append(text[:cut_point])
                 pages.append(page)
                 text = text[cut_point:].strip()
+                split_count += 1
 
             if text:  # Add remaining text if not empty
                 result.append(text)
                 pages.append(page)
+
+        if split_count > 0:
+            self.logger.debug(
+                "Texts split to ensure length constraints",
+                extra={
+                    "original_texts_count": len(texts),
+                    "result_segments_count": len(result),
+                    "splits_performed": split_count
+                }
+            )
 
         return result, pages
 

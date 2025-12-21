@@ -10,6 +10,7 @@ from pymilvus.exceptions import ConnectionNotExistException
 from .connection_manager import ConnectionManager
 from .collection_manager import CollectionManager
 from .data_manager import DataManager
+from src.utils import get_logger
 
 
 class MilvusClient:
@@ -57,8 +58,21 @@ class MilvusClient:
         self._connection_manager = ConnectionManager()
         self._collection_manager = CollectionManager(alias=alias)
         self._data_manager = DataManager()
+        self.logger = get_logger(__name__)
 
         self._collection: Optional[Collection] = None
+
+        self.logger.info(
+            "Initializing MilvusClient",
+            extra={
+                "dbname": dbname,
+                "collection_name": collection_name,
+                "alias": alias,
+                "name_schema": name_schema,
+                "embedding_dim": embedding_dim,
+                "name_index": name_index
+            }
+        )
 
         # Connect and load database
         self._connection_manager.connect(
@@ -78,12 +92,14 @@ class MilvusClient:
             Collection: Loaded collection.
         """
         if self._collection is None:
+            self.logger.debug("Loading collection", extra={"collection_name": self.collection_name})
             self._collection = self._collection_manager.load_collection(
                 collection_name=self.collection_name,
                 name_schema=self.name_schema,
                 embedding_dim=self.embedding_dim,
                 name_index=self.name_index
             )
+            self.logger.info("Collection loaded", extra={"collection_name": self.collection_name})
         return self._collection
 
     def create_partition(self, *, partition_name: str) -> None:
@@ -93,11 +109,13 @@ class MilvusClient:
         Args:
             partition_name: Partition name.
         """
+        self.logger.debug("Creating partition", extra={"partition_name": partition_name})
         collection = self.load_collection()
         self._collection_manager.create_partition(
             collection=collection,
             partition_name=partition_name
         )
+        self.logger.info("Partition created", extra={"partition_name": partition_name})
 
     def insert_documents(
         self,
@@ -116,6 +134,15 @@ class MilvusClient:
             metadata: Additional metadata (optional).
             partition_name: Partition name (optional).
         """
+        self.logger.debug(
+            "Inserting documents",
+            extra={
+                "texts_count": len(texts),
+                "partition_name": partition_name,
+                "collection_name": self.collection_name
+            }
+        )
+        
         data = self._data_manager.prepare_data_for_insertion(
             texts=texts,
             embeddings=embeddings,
@@ -128,27 +155,46 @@ class MilvusClient:
             data=data,
             partition_name=partition_name
         )
+        
+        self.logger.info(
+            "Documents inserted successfully",
+            extra={
+                "documents_count": len(texts),
+                "partition_name": partition_name,
+                "collection_name": self.collection_name
+            }
+        )
 
     def close(self) -> None:
         """Closes connection and releases resources."""
+        self.logger.debug("Closing MilvusClient", extra={"collection_name": self.collection_name})
+        
         # Try to release collection only if connection exists
         if self._collection:
             try:
                 # Check if connection exists before releasing collection
                 if connections.has_connection(self.alias):
                     self._collection_manager.release_collection(collection=self._collection)
+                    self.logger.debug("Collection released", extra={"collection_name": self.collection_name})
             except ConnectionNotExistException:
                 # Connection already closed, skip collection release
+                self.logger.debug("Connection already closed, skipping collection release")
                 pass
-            except Exception:
+            except Exception as e:
                 # Other errors during release are not critical, continue with disconnect
+                self.logger.warning(
+                    f"Error releasing collection (non-critical): {str(e)}",
+                    extra={"collection_name": self.collection_name}
+                )
                 pass
         
         # Disconnect connection (this handles the case where connection doesn't exist)
         try:
             self._connection_manager.disconnect(alias=self.alias)
-        except Exception:
+            self.logger.info("MilvusClient closed successfully", extra={"collection_name": self.collection_name})
+        except Exception as e:
             # Connection may already be closed, ignore error
+            self.logger.debug(f"Connection already closed: {str(e)}")
             pass
 
     def __enter__(self):

@@ -5,6 +5,7 @@ Prepares document chunks for insertion into Milvus
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from src.utils import get_logger
 
 
 class DocumentPreparer:
@@ -46,20 +47,36 @@ class DocumentPreparer:
         Raises:
             ValueError: If required metadata is missing or data lengths don't match.
         """
+        logger = get_logger(__name__)
+        
         if len(texts) != len(embeddings):
-            raise ValueError(
-                f"Number of texts ({len(texts)}) must match number of embeddings ({len(embeddings)})"
-            )
+            error_msg = f"Number of texts ({len(texts)}) must match number of embeddings ({len(embeddings)})"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if not texts:
+            logger.debug("Empty texts list, returning empty result")
             return []
+
+        logger.debug(
+            "Preparing document chunks",
+            extra={
+                "texts_count": len(texts),
+                "file_id": file_metadata.get('file_id'),
+                "file_name": file_metadata.get('file_name'),
+                "has_chunks_metadata": chunks_metadata is not None
+            }
+        )
 
         # Validate required file metadata
         if 'file_id' not in file_metadata:
+            logger.error("file_metadata must contain 'file_id'")
             raise ValueError("file_metadata must contain 'file_id'")
         if 'file_name' not in file_metadata:
+            logger.error("file_metadata must contain 'file_name'")
             raise ValueError("file_metadata must contain 'file_name'")
         if 'type_file' not in file_metadata:
+            logger.error("file_metadata must contain 'type_file'")
             raise ValueError("file_metadata must contain 'type_file'")
 
         # Get file-level metadata values
@@ -127,6 +144,15 @@ class DocumentPreparer:
 
             prepared_data.append(data)
 
+        logger.info(
+            "Image descriptions prepared successfully",
+            extra={
+                "images_count": len(prepared_data),
+                "file_id": file_id,
+                "file_name": file_name
+            }
+        )
+
         return prepared_data
 
     @staticmethod
@@ -161,21 +187,39 @@ class DocumentPreparer:
         Raises:
             ValueError: If required metadata is missing or data lengths don't match.
         """
+        logger = get_logger(__name__)
+        
         if len(image_descriptions) != len(embeddings):
-            raise ValueError(
+            error_msg = (
                 f"Number of descriptions ({len(image_descriptions)}) must match "
                 f"number of embeddings ({len(embeddings)})"
             )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if not image_descriptions:
+            logger.debug("Empty image descriptions list, returning empty result")
             return []
+
+        logger.debug(
+            "Preparing image descriptions",
+            extra={
+                "images_count": len(image_descriptions),
+                "file_id": file_metadata.get('file_id'),
+                "file_name": file_metadata.get('file_name'),
+                "has_images_metadata": images_metadata is not None
+            }
+        )
 
         # Validate required file metadata
         if 'file_id' not in file_metadata:
+            logger.error("file_metadata must contain 'file_id'")
             raise ValueError("file_metadata must contain 'file_id'")
         if 'file_name' not in file_metadata:
+            logger.error("file_metadata must contain 'file_name'")
             raise ValueError("file_metadata must contain 'file_name'")
         if 'type_file' not in file_metadata:
+            logger.error("file_metadata must contain 'type_file'")
             raise ValueError("file_metadata must contain 'type_file'")
 
         # Get file-level metadata values

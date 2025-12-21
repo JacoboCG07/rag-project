@@ -6,6 +6,7 @@ Handles generation and uploading of document summaries
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from rag.extractors.base import ExtractionResult
 from ..milvus.milvus_client import MilvusClient
+from src.utils import get_logger
 
 class SummaryProcessor:
     """
@@ -31,6 +32,9 @@ class SummaryProcessor:
         self.milvus_client = milvus_client
         self.generate_summary_func = generate_summary_func
         self.generate_embeddings_func = generate_embeddings_func
+        self.logger = get_logger(__name__)
+        
+        self.logger.info("Initializing SummaryProcessor")
 
     def process_and_upload_summary(
         self,
@@ -55,8 +59,17 @@ class SummaryProcessor:
             ValueError: If content is empty or invalid.
         """
         try:
+            self.logger.info(
+                "Starting summary processing",
+                extra={
+                    "file_id": file_id,
+                    "partition_name": partition_name
+                }
+            )
+            
             # Validate data format
             if not isinstance(document_data, ExtractionResult):
+                self.logger.error("document_data must be an ExtractionResult instance")
                 raise ValueError("document_data must be an ExtractionResult instance")
 
             content = document_data.content
@@ -64,6 +77,7 @@ class SummaryProcessor:
             metadata_obj = document_data.metadata
 
             if not content or not isinstance(content, list):
+                self.logger.error("content must be a non-empty list of texts")
                 raise ValueError("content must be a non-empty list of texts")
 
             # Get file_name and file_type from metadata
@@ -72,6 +86,16 @@ class SummaryProcessor:
             source_id = file_id  # Use file_id as source_id
             num_images = len(images) if images else 0
 
+            self.logger.debug(
+                "Processing summary",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "content_chunks": len(content),
+                    "images_count": num_images
+                }
+            )
+
             # Create partition if it doesn't exist
             self.milvus_client.create_partition(partition_name=partition_name)
 
@@ -79,6 +103,7 @@ class SummaryProcessor:
             summary = self._generate_summary_from_content(content=content)
 
             if not summary:
+                self.logger.error("Failed to generate summary", extra={"file_id": file_id, "file_name": file_name})
                 return False, f"Failed to generate summary for {file_name}"
 
             # Process and insert summary
@@ -93,6 +118,16 @@ class SummaryProcessor:
                 num_images=num_images
             )
 
+            self.logger.info(
+                "Summary generated and uploaded successfully",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "summary_length": len(summary),
+                    "partition_name": partition_name
+                }
+            )
+
             return True, f"Summary for {file_name} generated and uploaded successfully"
 
         except Exception as e:
@@ -102,6 +137,16 @@ class SummaryProcessor:
             except:
                 file_name = "unknown"
             error_msg = f"Error processing summary for {file_name}: {str(e)}"
+            self.logger.error(
+                error_msg,
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "partition_name": partition_name,
+                    "error_type": type(e).__name__
+                },
+                exc_info=True
+            )
             return False, error_msg
 
     def _generate_summary_from_content(
@@ -118,6 +163,11 @@ class SummaryProcessor:
         Returns:
             str: Generated summary.
         """
+        self.logger.debug(
+            "Generating summary from content",
+            extra={"content_chunks": len(content)}
+        )
+        
         # Combine all content into a single text
         full_text = "\n\n".join([
             text.strip() for text in content 
@@ -125,15 +175,25 @@ class SummaryProcessor:
         ])
         
         if not full_text:
+            self.logger.warning("Empty full text after combining content chunks")
             return ""
         
         # Generate summary using the provided function
         summary = self.generate_summary_func(full_text)
         
         if not isinstance(summary, str):
+            self.logger.error("generate_summary_func must return a string")
             raise ValueError(
                 "generate_summary_func must return a string"
             )
+        
+        self.logger.debug(
+            "Summary generated",
+            extra={
+                "original_length": len(full_text),
+                "summary_length": len(summary.strip())
+            }
+        )
         
         return summary.strip()
 

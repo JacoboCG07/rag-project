@@ -3,12 +3,13 @@ Base interface for text embedders
 Implements Strategy pattern to allow different embedding providers
 """
 
-from abc import ABC, abstractmethod
 from typing import Tuple, Optional, List
-import time
-import multiprocessing
+from abc import ABC, abstractmethod
+from src.utils import get_logger
 from functools import partial
-
+import multiprocessing
+import importlib
+import time
 
 class RateLimitError(Exception):
     """Custom exception for rate limit errors."""
@@ -110,8 +111,21 @@ class BaseEmbedder(ABC):
         Raises:
             Exception: If processing fails after all retries.
         """
+        logger = get_logger(__name__)
+        
         if not texts:
+            logger.debug("Empty texts list provided for batch embedding generation")
             return []
+
+        logger.debug(
+            "Starting batch embedding generation",
+            extra={
+                "total_texts": len(texts),
+                "batch_size": batch_size,
+                "max_retries": max_retries,
+                "retry_delay": retry_delay
+            }
+        )
 
         # Filter empty texts and keep track of original indices
         valid_texts = []
@@ -122,6 +136,7 @@ class BaseEmbedder(ABC):
                 valid_indices.append(i)
 
         if not valid_texts:
+            logger.warning("No valid texts found after filtering")
             return []
 
         # Split into batches
@@ -129,6 +144,14 @@ class BaseEmbedder(ABC):
             valid_texts[i:i + batch_size]
             for i in range(0, len(valid_texts), batch_size)
         ]
+
+        logger.debug(
+            "Batches created for processing",
+            extra={
+                "total_batches": len(batches),
+                "batch_size": batch_size
+            }
+        )
 
         # Process batches with multiprocessing
         all_results = []
@@ -160,6 +183,17 @@ class BaseEmbedder(ABC):
         for idx, result in zip(valid_indices, all_results):
             results[idx] = result
 
+        successful_count = sum(1 for r in results if r is not None)
+        logger.info(
+            "Batch embedding generation completed",
+            extra={
+                "total_texts": len(texts),
+                "successful_embeddings": successful_count,
+                "failed_embeddings": len(texts) - successful_count,
+                "batches_processed": len(batches)
+            }
+        )
+
         return results
 
     @staticmethod
@@ -189,13 +223,22 @@ class BaseEmbedder(ABC):
             List[Tuple[List[float], Optional[int]]]: List of (embedding, token_count) tuples.
         """
         # Import and create embedder instance in worker process
-        import importlib
+        
+        logger = get_logger(__name__)
         module = importlib.import_module(embedder_module)
         embedder_class = getattr(module, embedder_class_name)
         embedder = embedder_class._from_config(embedder_config)
         
+        logger.debug(
+            "Processing batch in worker process",
+            extra={
+                "batch_size": len(batch),
+                "embedder_class": embedder_class_name
+            }
+        )
+        
         results = []
-        for text in batch:
+        for text_idx, text in enumerate(batch):
             for attempt in range(1, max_retries + 1):
                 try:
                     embedding, token_count = embedder.generate_embedding(text=text)
@@ -204,18 +247,50 @@ class BaseEmbedder(ABC):
 
                 except RateLimitError:
                     if attempt < max_retries:
+                        logger.warning(
+                            f"Rate limit error, retrying (attempt {attempt}/{max_retries})",
+                            extra={
+                                "attempt": attempt,
+                                "max_retries": max_retries,
+                                "retry_delay": retry_delay
+                            }
+                        )
                         time.sleep(retry_delay)
                         continue
                     else:
                         # Max retries reached, raise error
-                        raise Exception(
+                        error_msg = (
                             f"Failed to generate embedding after {max_retries} retries. "
                             f"Rate limit exceeded for text: {text[:50]}..."
                         )
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "text_index": text_idx,
+                                "max_retries": max_retries
+                            }
+                        )
+                        raise Exception(error_msg)
 
                 except Exception as e:
                     # Other errors, raise immediately
+                    logger.error(
+                        f"Error generating embedding: {str(e)}",
+                        extra={
+                            "text_index": text_idx,
+                            "error_type": type(e).__name__
+                        },
+                        exc_info=True
+                    )
                     raise Exception(f"Error generating embedding: {str(e)}") from e
 
+        logger.debug(
+            "Batch processed successfully in worker",
+            extra={
+                "batch_size": len(batch),
+                "successful": len(results)
+            }
+        )
+        
         return results
 

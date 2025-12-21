@@ -7,6 +7,7 @@ from .milvus.milvus_client import MilvusClient
 from typing import Any, Optional, Tuple, Callable
 from .uploaders import DocumentUploader, SummaryProcessor
 from ..extractors.base.types import ExtractionResult, BaseFileMetadata
+from src.utils import get_logger
 
 class DocumentProcessor:
     """
@@ -76,6 +77,19 @@ class DocumentProcessor:
         self.generate_embeddings_func = generate_embeddings_func
         self.generate_summary_func = generate_summary_func
         self.describe_image_func = describe_image_func
+        self.logger = get_logger(__name__)
+
+        self.logger.info(
+            "Initializing DocumentProcessor",
+            extra={
+                "dbname": dbname,
+                "collection_name_documents": collection_name_documents,
+                "collection_name_summaries": collection_name_summaries,
+                "embedding_dim": embedding_dim,
+                "has_generate_summary_func": generate_summary_func is not None,
+                "has_describe_image_func": describe_image_func is not None
+            }
+        )
 
         # Initialize DocumentUploader with embedding function and image description function
         self._document_uploader = DocumentUploader(
@@ -91,8 +105,12 @@ class DocumentProcessor:
                 generate_summary_func=generate_summary_func,
                 generate_embeddings_func=generate_embeddings_func
             )
+            self.logger.debug("SummaryProcessor initialized")
         else:
             self._summary_processor = None
+            self.logger.debug("SummaryProcessor not initialized (no generate_summary_func provided)")
+        
+        self.logger.info("DocumentProcessor initialized successfully")
 
     def process_and_insert(
         self,
@@ -122,6 +140,17 @@ class DocumentProcessor:
         try:
             # Get file_name from metadata for error messages
             file_name = document_data.metadata.file_name if hasattr(document_data, 'metadata') else "unknown"
+            
+            self.logger.info(
+                "Starting document processing and insertion",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "process_images": process_images,
+                    "partition_name": partition_name,
+                    "has_summary_processor": self._summary_processor is not None
+                }
+            )
 
             success_doc, message_doc = self._document_uploader.upload_document(
                 document_data=document_data,
@@ -130,19 +159,64 @@ class DocumentProcessor:
                 partition_name=partition_name
             )
 
-            if not success_doc: return False, message_doc
+            if not success_doc:
+                self.logger.error(
+                    "Document upload failed",
+                    extra={
+                        "file_id": file_id,
+                        "file_name": file_name,
+                        "error_message": message_doc
+                    }
+                )
+                return False, message_doc
+
+            self.logger.info(
+                "Document uploaded successfully",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "message": message_doc
+                }
+            )
 
             if self._summary_processor:
+                self.logger.debug("Processing summary", extra={"file_id": file_id})
                 success_summary, message_summary = self._summary_processor.process_and_upload_summary(
                     document_data=document_data,
                     file_id=file_id,
                     partition_name=partition_name
                 )
 
-                if not success_summary:  return False, f"{message_doc}, but summary failed: {message_summary}"
+                if not success_summary:
+                    self.logger.error(
+                        "Summary processing failed",
+                        extra={
+                            "file_id": file_id,
+                            "file_name": file_name,
+                            "error_message": message_summary
+                        }
+                    )
+                    return False, f"{message_doc}, but summary failed: {message_summary}"
 
+                self.logger.info(
+                    "Document and summary processed successfully",
+                    extra={
+                        "file_id": file_id,
+                        "file_name": file_name,
+                        "document_message": message_doc,
+                        "summary_message": message_summary
+                    }
+                )
                 return True, f"{message_doc}, {message_summary}"
             else:
+                self.logger.info(
+                    "Document processed successfully (no summary)",
+                    extra={
+                        "file_id": file_id,
+                        "file_name": file_name,
+                        "message": message_doc
+                    }
+                )
                 return True, message_doc
 
 
@@ -153,12 +227,31 @@ class DocumentProcessor:
             except:
                 file_name = "unknown"
             error_msg = f"Error processing document {file_name}: {str(e)}"
+            self.logger.error(
+                error_msg,
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "partition_name": partition_name,
+                    "error_type": type(e).__name__
+                },
+                exc_info=True
+            )
             return False, error_msg
 
     def close(self) -> None:
         """Closes connections with both Milvus collections."""
-        self.milvus_client_documents.close()
-        self.milvus_client_summaries.close()
+        self.logger.info("Closing DocumentProcessor connections")
+        try:
+            self.milvus_client_documents.close()
+            self.milvus_client_summaries.close()
+            self.logger.info("DocumentProcessor connections closed successfully")
+        except Exception as e:
+            self.logger.error(
+                f"Error closing DocumentProcessor connections: {str(e)}",
+                extra={"error_type": type(e).__name__},
+                exc_info=True
+            )
 
     def __enter__(self):
         """Context manager entry."""

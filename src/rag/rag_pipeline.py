@@ -36,14 +36,17 @@ class RAGPipeline:
         self.config = config
         
         self.logger.info(
-            "Inicializando RAG Pipeline",
+            "Initializing RAG Pipeline",
             extra={
                 "milvus_db": config.milvus.dbname,
                 "collection_documents": config.collection_name_documents,
                 "collection_summaries": config.collection_name_summaries,
                 "embedding_dim": config.embedding_dim,
                 "milvus_host": config.milvus.host or "default",
-                "milvus_port": config.milvus.port or "default"
+                "milvus_port": config.milvus.port or "default",
+                "chunk_size": config.chunk_size,
+                "chunk_overlap": config.chunk_overlap,
+                "extract_images": config.extract_images
             }
         )
         
@@ -63,10 +66,14 @@ class RAGPipeline:
                 host=config.milvus.host,
                 port=config.milvus.port
             )
-            self.logger.info("RAG Pipeline inicializado correctamente")
+            self.logger.info("RAG Pipeline initialized successfully")
         except Exception as e:
             self.logger.error(
-                f"Error al inicializar RAG Pipeline: {str(e)}",
+                f"Error initializing RAG Pipeline: {str(e)}",
+                extra={
+                    "milvus_db": config.milvus.dbname,
+                    "error_type": type(e).__name__
+                },
                 exc_info=True
             )
             raise
@@ -101,7 +108,7 @@ class RAGPipeline:
         file_id = self._generate_file_id(file_path)
         
         self.logger.info(
-            "Iniciando procesamiento de archivo",
+            "Starting file processing",
             extra={
                 "file_path": str(file_path_obj),
                 "file_id": file_id,
@@ -115,8 +122,14 @@ class RAGPipeline:
             extraction_manager = DocumentExtractionManager(folder_path=str(file_path_obj.parent))
             
             # Extract the document data
-            #mandarle el file_id
-            self.logger.debug(f"Extrayendo contenido del archivo: {file_path}")
+            self.logger.debug(
+                "Extracting file content",
+                extra={
+                    "file_path": str(file_path_obj),
+                    "file_id": file_id,
+                    "extract_images": extract_process_images
+                }
+            )
             document_data: ExtractionResult[BaseFileMetadata] = extraction_manager.extract_file(
                 file_path=file_path_obj,
                 extract_images=extract_process_images
@@ -127,7 +140,7 @@ class RAGPipeline:
             images_count = len(document_data.images) if document_data.images else 0
             
             self.logger.info(
-                "Contenido extraído del archivo",
+                "File content extracted",
                 extra={
                     "file_id": file_id,
                     "file_name": file_name,
@@ -137,7 +150,14 @@ class RAGPipeline:
             )
 
             # Process and insert document in milvus
-            self.logger.debug(f"Procesando e insertando documento en Milvus: {file_id}")
+            self.logger.debug(
+                "Processing and inserting document into Milvus",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "partition_name": partition_name
+                }
+            )
             success, message = self.document_processor.process_and_insert(
                 file_id=file_id,
                 document_data=document_data,
@@ -154,7 +174,7 @@ class RAGPipeline:
             
             if success:
                 self.logger.info(
-                    "Archivo procesado exitosamente",
+                    "File processed successfully",
                     extra={
                         "file_id": file_id,
                         "file_name": file_name,
@@ -164,7 +184,7 @@ class RAGPipeline:
                 )
             else:
                 self.logger.error(
-                    "Error al procesar archivo",
+                    "Error processing file",
                     extra={
                         "file_id": file_id,
                         "file_name": file_name,
@@ -177,11 +197,12 @@ class RAGPipeline:
             
         except Exception as e:
             self.logger.error(
-                f"Excepción al procesar archivo: {str(e)}",
+                f"Exception processing file: {str(e)}",
                 extra={
                     "file_path": str(file_path_obj),
                     "file_id": file_id,
-                    "partition_name": partition_name
+                    "partition_name": partition_name,
+                    "error_type": type(e).__name__
                 },
                 exc_info=True
             )
@@ -191,7 +212,7 @@ class RAGPipeline:
                 "file_name": file_path_obj.name,
                 "file_path": str(file_path_obj)
             }
-            return False, f"Error al procesar archivo: {str(e)}", result_info
+            return False, f"Error processing file: {str(e)}", result_info
 
 
     @staticmethod
@@ -212,13 +233,14 @@ class RAGPipeline:
 
     def close(self) -> None:
         """Closes connections with Milvus."""
-        self.logger.info("Cerrando conexiones del RAG Pipeline")
+        self.logger.info("Closing RAG Pipeline connections")
         try:
             self.document_processor.close()
-            self.logger.info("Conexiones cerradas correctamente")
+            self.logger.info("RAG Pipeline connections closed successfully")
         except Exception as e:
             self.logger.error(
-                f"Error al cerrar conexiones: {str(e)}",
+                f"Error closing RAG Pipeline connections: {str(e)}",
+                extra={"error_type": type(e).__name__},
                 exc_info=True
             )
 
@@ -230,7 +252,7 @@ class RAGPipeline:
         """Context manager exit."""
         if exc_type is not None:
             self.logger.error(
-                f"Excepción en context manager: {exc_type.__name__}",
+                f"Exception in context manager: {exc_type.__name__}",
                 extra={
                     "exception_type": exc_type.__name__,
                     "exception_value": str(exc_val) if exc_val else None

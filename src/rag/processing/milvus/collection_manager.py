@@ -10,6 +10,7 @@ from pymilvus.exceptions import ConnectionNotExistException
 from .exceptions import MilvusCollectionError
 from .schemas import Schemas, SchemaNotFoundError
 from .indices import Indices, IndexNotFoundError
+from src.utils import get_logger
 
 
 class CollectionManager:
@@ -28,6 +29,9 @@ class CollectionManager:
         self.alias = alias
         self._schemas = Schemas()
         self._indices = Indices()
+        self.logger = get_logger(__name__)
+        
+        self.logger.debug("Initializing CollectionManager", extra={"alias": alias})
 
     def create_collection(
         self,
@@ -51,16 +55,35 @@ class CollectionManager:
             MilvusCollectionError: If collection cannot be created.
         """
         try:
+            self.logger.debug(
+                "Creating collection",
+                extra={
+                    "collection_name": collection_name,
+                    "name_schema": name_schema,
+                    "embedding_dim": embedding_dim
+                }
+            )
             schema = self._schemas.get_schema(name_schema=name_schema, embedding_dim=embedding_dim)
             collection = Collection(
                 name=collection_name,
                 schema=schema,
                 using=self.alias
             )
+            self.logger.info("Collection created successfully", extra={"collection_name": collection_name})
             return collection
         except SchemaNotFoundError as e:
+            self.logger.error(
+                f"Schema not found: {str(e)}",
+                extra={"collection_name": collection_name, "name_schema": name_schema},
+                exc_info=True
+            )
             raise MilvusCollectionError(str(e)) from e
         except Exception as e:
+            self.logger.error(
+                f"Error creating collection: {str(e)}",
+                extra={"collection_name": collection_name, "error_type": type(e).__name__},
+                exc_info=True
+            )
             raise MilvusCollectionError(
                 f"Error creating collection '{collection_name}': {str(e)}"
             ) from e
@@ -86,9 +109,19 @@ class CollectionManager:
             Collection: Loaded or created collection.
         """
         try:
+            self.logger.debug(
+                "Loading collection",
+                extra={
+                    "collection_name": collection_name,
+                    "name_schema": name_schema,
+                    "embedding_dim": embedding_dim,
+                    "name_index": name_index
+                }
+            )
             collections = utility.list_collections(using=self.alias)
             
             if collection_name not in collections:
+                self.logger.info("Collection does not exist, creating new collection", extra={"collection_name": collection_name})
                 collection = self.create_collection(
                     collection_name=collection_name,
                     name_schema=name_schema,
@@ -96,10 +129,17 @@ class CollectionManager:
                 )
                 self._create_index(collection=collection, name_index=name_index)
             else:
+                self.logger.debug("Collection already exists, loading it", extra={"collection_name": collection_name})
                 collection = Collection(name=collection_name, using=self.alias)
             
+            self.logger.info("Collection loaded successfully", extra={"collection_name": collection_name})
             return collection
         except Exception as e:
+            self.logger.error(
+                f"Error loading collection: {str(e)}",
+                extra={"collection_name": collection_name, "error_type": type(e).__name__},
+                exc_info=True
+            )
             raise MilvusCollectionError(
                 f"Error loading collection '{collection_name}': {str(e)}"
             ) from e
@@ -118,9 +158,33 @@ class CollectionManager:
             partition_name: Partition name.
         """
         try:
+            logger = get_logger(__name__)
+            collection_name = collection.name if hasattr(collection, 'name') else "unknown"
+            
             if not collection.has_partition(partition_name=partition_name):
                 collection.create_partition(partition_name=partition_name)
+                logger.info(
+                    "Partition created successfully",
+                    extra={
+                        "collection_name": collection_name,
+                        "partition_name": partition_name
+                    }
+                )
+            else:
+                logger.debug(
+                    "Partition already exists",
+                    extra={
+                        "collection_name": collection_name,
+                        "partition_name": partition_name
+                    }
+                )
         except Exception as e:
+            logger = get_logger(__name__)
+            logger.error(
+                f"Error creating partition: {str(e)}",
+                extra={"partition_name": partition_name, "error_type": type(e).__name__},
+                exc_info=True
+            )
             raise MilvusCollectionError(
                 f"Error creating partition '{partition_name}': {str(e)}"
             ) from e
@@ -144,9 +208,27 @@ class CollectionManager:
                 field_name=field_name,
                 index_params=index_params
             )
+            self.logger.info(
+                "Index created successfully",
+                extra={
+                    "collection_name": collection_name,
+                    "name_index": name_index,
+                    "field_name": field_name
+                }
+            )
         except IndexNotFoundError as e:
+            self.logger.error(
+                f"Index not found: {str(e)}",
+                extra={"name_index": name_index},
+                exc_info=True
+            )
             raise MilvusCollectionError(str(e)) from e
         except Exception as e:
+            self.logger.error(
+                f"Error creating index: {str(e)}",
+                extra={"name_index": name_index, "error_type": type(e).__name__},
+                exc_info=True
+            )
             raise MilvusCollectionError(
                 f"Error creating index: {str(e)}"
             ) from e

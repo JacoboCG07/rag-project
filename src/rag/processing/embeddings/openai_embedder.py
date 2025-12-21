@@ -13,6 +13,7 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 from .base_embedder import BaseEmbedder, RateLimitError
+from src.utils import get_logger
 
 
 class OpenAIEmbedder(BaseEmbedder):
@@ -58,6 +59,15 @@ class OpenAIEmbedder(BaseEmbedder):
         self.model = model
         self.count_tokens = count_tokens
         self.client = OpenAI(api_key=self.api_key)
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing OpenAIEmbedder",
+            extra={
+                "model": model,
+                "count_tokens": count_tokens
+            }
+        )
 
     def generate_embedding(
         self,
@@ -79,9 +89,18 @@ class OpenAIEmbedder(BaseEmbedder):
             Exception: If API call fails.
         """
         if not text or not isinstance(text, str):
+            self.logger.error("Text must be a non-empty string")
             raise ValueError("text must be a non-empty string")
 
         try:
+            self.logger.debug(
+                "Generating embedding with OpenAI",
+                extra={
+                    "model": self.model,
+                    "text_length": len(text)
+                }
+            )
+            
             response = self.client.embeddings.create(
                 model=self.model,
                 input=text.strip()
@@ -98,13 +117,40 @@ class OpenAIEmbedder(BaseEmbedder):
                     # Fallback: estimate tokens (rough approximation: 1 token ≈ 4 characters)
                     token_count = len(text) // 4
 
+            self.logger.debug(
+                "Embedding generated successfully",
+                extra={
+                    "model": self.model,
+                    "embedding_dimensions": len(embedding),
+                    "token_count": token_count
+                }
+            )
+
             return embedding, token_count
 
         except Exception as e:
             error_msg = str(e)
             # Check for rate limit error (429)
-            if "429" in error_msg or "Too Many Requests" in error_msg or "rate_limit" in error_msg.lower():
+            is_rate_limit = "429" in error_msg or "Too Many Requests" in error_msg or "rate_limit" in error_msg.lower()
+            
+            if is_rate_limit:
+                self.logger.warning(
+                    f"Rate limit error generating embedding: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "error_type": "rate_limit"
+                    }
+                )
                 raise RateLimitError(f"Rate limit exceeded: {error_msg}") from e
+            else:
+                self.logger.error(
+                    f"Error generating embedding with OpenAI: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
             raise Exception(f"Error generating embedding with OpenAI: {str(e)}") from e
 
     def get_dimensions(self) -> int:

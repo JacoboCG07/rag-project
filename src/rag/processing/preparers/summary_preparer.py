@@ -5,6 +5,7 @@ Prepares document summaries for insertion into Milvus
 
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from src.utils import get_logger
 
 
 class SummaryPreparer:
@@ -42,17 +43,32 @@ class SummaryPreparer:
         Raises:
             ValueError: If required metadata is missing.
         """
+        logger = get_logger(__name__)
+        
         if not summary:
+            logger.error("Summary cannot be empty")
             raise ValueError("summary cannot be empty")
 
         metadata = metadata or {}
         
+        logger.debug(
+            "Preparing summary",
+            extra={
+                "summary_length": len(summary),
+                "file_id": metadata.get('file_id'),
+                "file_name": metadata.get('file_name')
+            }
+        )
+        
         # Validate required metadata
         if 'file_id' not in metadata:
+            logger.error("metadata must contain 'file_id'")
             raise ValueError("metadata must contain 'file_id'")
         if 'file_name' not in metadata:
+            logger.error("metadata must contain 'file_name'")
             raise ValueError("metadata must contain 'file_name'")
         if 'type_file' not in metadata:
+            logger.error("metadata must contain 'type_file'")
             raise ValueError("metadata must contain 'type_file'")
 
         # Get metadata values
@@ -82,6 +98,15 @@ class SummaryPreparer:
             "total_chapters": total_chapters,
             "total_num_image": total_num_image,
         }
+
+        logger.info(
+            "Summary prepared successfully",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "summary_length": len(summary)
+            }
+        )
 
         return data
 

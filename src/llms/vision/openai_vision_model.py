@@ -13,6 +13,7 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 from .base_vision_model import BaseVisionModel
+from src.utils import get_logger
 
 
 class OpenAIVisionModel(BaseVisionModel):
@@ -58,6 +59,16 @@ class OpenAIVisionModel(BaseVisionModel):
         self.default_max_tokens = max_tokens
         self.default_temperature = temperature
         self.client = OpenAI(api_key=self.api_key)
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing OpenAIVisionModel",
+            extra={
+                "model": model,
+                "default_max_tokens": max_tokens,
+                "default_temperature": temperature
+            }
+        )
 
     def call_vision_model(
         self,
@@ -88,9 +99,11 @@ class OpenAIVisionModel(BaseVisionModel):
             Exception: If the API call fails.
         """
         if not prompt or not isinstance(prompt, str) or not prompt.strip():
+            self.logger.error("Prompt cannot be empty")
             raise ValueError("prompt cannot be empty")
 
         if not images:
+            self.logger.error("Images cannot be empty")
             raise ValueError("images cannot be empty")
 
         # Normalize images to list
@@ -100,9 +113,20 @@ class OpenAIVisionModel(BaseVisionModel):
             images_list = images
 
         if not images_list:
+            self.logger.error("Images list cannot be empty")
             raise ValueError("images list cannot be empty")
 
         try:
+            self.logger.debug(
+                "Calling OpenAI Vision API",
+                extra={
+                    "model": self.model,
+                    "prompt_length": len(prompt),
+                    "images_count": len(images_list),
+                    "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
+                    "temperature": temperature if temperature is not None else self.default_temperature
+                }
+            )
             # Prepare content for OpenAI API
             content = [{"type": "text", "text": prompt.strip()}]
 
@@ -137,11 +161,56 @@ class OpenAIVisionModel(BaseVisionModel):
 
             result = response.choices[0].message.content
             if not result:
+                self.logger.error("OpenAI Vision API returned an empty response")
                 raise Exception("OpenAI Vision API returned an empty response.")
+
+            # Log usage information if available
+            usage_info = {}
+            if hasattr(response, 'usage'):
+                usage = response.usage
+                if hasattr(usage, 'prompt_tokens'):
+                    usage_info['prompt_tokens'] = usage.prompt_tokens
+                if hasattr(usage, 'completion_tokens'):
+                    usage_info['completion_tokens'] = usage.completion_tokens
+                if hasattr(usage, 'total_tokens'):
+                    usage_info['total_tokens'] = usage.total_tokens
+
+            self.logger.info(
+                "OpenAI Vision API call completed successfully",
+                extra={
+                    "model": self.model,
+                    "images_count": len(images_list),
+                    "response_length": len(result),
+                    **usage_info
+                }
+            )
 
             return result.strip()
 
         except Exception as e:
+            error_msg = str(e)
+            # Check for rate limit errors
+            is_rate_limit = "429" in error_msg or "rate_limit" in error_msg.lower() or "Too Many Requests" in error_msg
+            
+            if is_rate_limit:
+                self.logger.warning(
+                    f"Rate limit error calling OpenAI Vision API: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "images_count": len(images_list),
+                        "error_type": "rate_limit"
+                    }
+                )
+            else:
+                self.logger.error(
+                    f"Error calling OpenAI Vision API: {error_msg}",
+                    extra={
+                        "model": self.model,
+                        "images_count": len(images_list),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
             raise Exception(f"Error calling OpenAI Vision API: {str(e)}") from e
 
     def _prepare_image_data(

@@ -7,6 +7,7 @@ from typing import Dict, Type, Optional
 
 from .base_chunker import BaseChunker
 from .text_chunker import TextChunker
+from src.utils import get_logger
 
 
 class ChunkingFactory:
@@ -47,14 +48,34 @@ class ChunkingFactory:
         Raises:
             ValueError: If strategy is not registered.
         """
+        logger = get_logger(__name__)
         key = strategy.strip().lower()
         chunker_cls = cls._registry.get(key)
 
         if not chunker_cls:
-            raise ValueError(
+            error_msg = (
                 f"No chunking strategy found for '{strategy}'. "
                 f"Valid options: {list(cls._registry.keys())}"
             )
+            logger.error(
+                error_msg,
+                extra={
+                    "strategy": strategy,
+                    "valid_strategies": list(cls._registry.keys())
+                }
+            )
+            raise ValueError(error_msg)
+
+        logger.debug(
+            "Creating chunker instance",
+            extra={
+                "strategy": strategy,
+                "chunker_class": chunker_cls.__name__,
+                "chunk_size": chunk_size,
+                "overlap": overlap,
+                "detect_chapters": detect_chapters
+            }
+        )
 
         # Create chunker instance with appropriate parameters
         if chunker_cls == TextChunker:

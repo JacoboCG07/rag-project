@@ -7,6 +7,7 @@ from ..milvus.milvus_client import MilvusClient
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from ...extractors.base.types import ExtractionResult, BaseFileMetadata, ImageData
 from .validators import validate_images_list
+from src.utils import get_logger
 
 class DocumentUploader:
     """
@@ -32,6 +33,14 @@ class DocumentUploader:
         self.milvus_client = milvus_client
         self.generate_embeddings_func = generate_embeddings_func
         self.describe_image_func = describe_image_func
+        self.logger = get_logger(__name__)
+        
+        self.logger.info(
+            "Initializing DocumentUploader",
+            extra={
+                "has_describe_image_func": describe_image_func is not None
+            }
+        )
 
     def upload_document(
         self,
@@ -58,8 +67,18 @@ class DocumentUploader:
             ValueError: If document_data doesn't have the expected format.
         """
         try:
+            self.logger.info(
+                "Starting document upload",
+                extra={
+                    "file_id": file_id,
+                    "process_images": process_images,
+                    "partition_name": partition_name
+                }
+            )
+            
             # Validate data format
             if not isinstance(document_data, ExtractionResult):
+                self.logger.error("document_data must be an ExtractionResult instance")
                 raise ValueError("document_data must be an ExtractionResult instance")
 
             content = document_data.content
@@ -67,9 +86,11 @@ class DocumentUploader:
             metadata_obj = document_data.metadata
 
             if not content:
+                self.logger.error("document_data must contain 'content' with at least one element")
                 raise ValueError("document_data must contain 'content' with at least one element")
 
             if not isinstance(content, list):
+                self.logger.error("'content' must be a list of texts")
                 raise ValueError("'content' must be a list of texts")
 
             # Get file_name and file_type from metadata
@@ -77,10 +98,29 @@ class DocumentUploader:
             file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
             source_id = file_id  # Use file_id as source_id
 
+            self.logger.debug(
+                "Processing document",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "content_chunks": len(content),
+                    "images_count": len(images)
+                }
+            )
+
             self.milvus_client.create_partition(partition_name=partition_name)
 
             # Process texts
             texts, embeddings = self._process_texts(content=content)
+            
+            self.logger.debug(
+                "Texts processed",
+                extra={
+                    "file_id": file_id,
+                    "texts_count": len(texts),
+                    "embeddings_count": len(embeddings)
+                }
+            )
 
             # Prepare metadata
             metadata = self._prepare_metadata(
@@ -100,14 +140,35 @@ class DocumentUploader:
                 metadata=metadata,
                 partition_name=partition_name
             )
+            
+            self.logger.info(
+                "Document texts inserted successfully",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "texts_count": len(texts),
+                    "partition_name": partition_name
+                }
+            )
 
             # Process images if requested and they exist
             if process_images and images:
+                self.logger.debug(
+                    "Processing images",
+                    extra={
+                        "file_id": file_id,
+                        "images_count": len(images)
+                    }
+                )
                 # Convert ImageData Pydantic models to dicts for validation
                 images_dict = [img.model_dump() if hasattr(img, 'model_dump') else img for img in images]
                 # Validate image structure
                 is_valid, error_msg = validate_images_list(images_dict)
                 if not is_valid:
+                    self.logger.error(
+                        f"Invalid image structure: {error_msg}",
+                        extra={"file_id": file_id, "images_count": len(images_dict)}
+                    )
                     raise ValueError(f"Invalid image structure: {error_msg}")
                 
                 self._process_images(
@@ -123,10 +184,31 @@ class DocumentUploader:
             if process_images and images:
                 message += f" (with {len(images)} images processed)"
 
+            self.logger.info(
+                "Document uploaded successfully",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "texts_count": len(texts),
+                    "images_processed": len(images) if process_images and images else 0,
+                    "partition_name": partition_name
+                }
+            )
+
             return True, message
 
         except Exception as e:
             error_msg = f"Error uploading document {file_name}: {str(e)}"
+            self.logger.error(
+                error_msg,
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "partition_name": partition_name,
+                    "error_type": type(e).__name__
+                },
+                exc_info=True
+            )
             return False, error_msg
 
     def _process_texts(
@@ -145,14 +227,17 @@ class DocumentUploader:
         """
         texts = []
         embeddings = []
+        skipped_count = 0
 
         for text in content:
             if not text or not isinstance(text, str):
+                skipped_count += 1
                 continue
 
             # Clean text
             cleaned_text = text.strip()
             if not cleaned_text:
+                skipped_count += 1
                 continue
 
             texts.append(cleaned_text)
@@ -163,6 +248,12 @@ class DocumentUploader:
                 # If it returns (embedding, token_count), extract just the embedding
                 embedding, _ = embedding
             embeddings.append(embedding)
+
+        if skipped_count > 0:
+            self.logger.debug(
+                "Skipped empty or invalid texts",
+                extra={"skipped_count": skipped_count, "processed_count": len(texts)}
+            )
 
         return texts, embeddings
 
@@ -188,10 +279,12 @@ class DocumentUploader:
             partition_name: Partition name.
         """
         if not images:
+            self.logger.debug("No images to process")
             return
 
         image_texts = []
         image_embeddings = []
+        skipped_count = 0
 
         for image in images:
             # Images are validated before calling this method, so we know they have the expected structure
@@ -203,6 +296,15 @@ class DocumentUploader:
             # Only process image if we have describe_image_func and image_base64
             if not self.describe_image_func or not image_base64:
                 # Skip this image if we can't describe it
+                skipped_count += 1
+                self.logger.debug(
+                    "Skipping image (no describe function or base64)",
+                    extra={
+                        "file_id": file_id,
+                        "page": page,
+                        "image_number": image_num
+                    }
+                )
                 continue
             
             # Try to describe the image using LLM
@@ -210,6 +312,16 @@ class DocumentUploader:
                 image_description = self.describe_image_func(image=image_base64)
             except Exception as e:
                 # If description fails, skip this image and continue with the next one
+                skipped_count += 1
+                self.logger.warning(
+                    f"Failed to describe image: {str(e)}",
+                    extra={
+                        "file_id": file_id,
+                        "page": page,
+                        "image_number": image_num,
+                        "error_type": type(e).__name__
+                    }
+                )
                 continue
 
             image_texts.append(image_description)
@@ -232,13 +344,35 @@ class DocumentUploader:
             pages=list(range(1, len(images) + 1))
         )
 
+        if skipped_count > 0:
+            self.logger.debug(
+                "Some images were skipped",
+                extra={
+                    "file_id": file_id,
+                    "total_images": len(images),
+                    "processed_images": len(image_texts),
+                    "skipped_images": skipped_count
+                }
+            )
+
         # Insert images
-        self.milvus_client.insert_documents(
-            texts=image_texts,
-            embeddings=image_embeddings,
-            metadata=metadata,
-            partition_name=partition_name
-        )
+        if image_texts:
+            self.milvus_client.insert_documents(
+                texts=image_texts,
+                embeddings=image_embeddings,
+                metadata=metadata,
+                partition_name=partition_name
+            )
+            
+            self.logger.info(
+                "Images inserted successfully",
+                extra={
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "images_count": len(image_texts),
+                    "partition_name": partition_name
+                }
+            )
 
     @staticmethod
     def _prepare_metadata(
