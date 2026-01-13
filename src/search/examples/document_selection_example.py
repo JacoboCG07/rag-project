@@ -5,7 +5,7 @@ Example usage of document selector
 import os
 from dotenv import load_dotenv
 from llms.text import OpenAITextModel
-from src.search.select_documents import DocumentSelector
+from src.search.document_selection import DocumentSelector
 from src.utils import get_logger
 
 load_dotenv()
@@ -156,3 +156,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

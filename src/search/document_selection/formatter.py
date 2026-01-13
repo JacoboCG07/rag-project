@@ -29,6 +29,7 @@ class MarkdownGenerator:
             str: Formatted markdown of the document.
         """
         # Extract summary information
+        file_id = summary.get("file_id", "unknown_id")
         file_name = summary.get("file_name", "unnamed_document")
         type_file = summary.get("type_file", "UNKNOWN").upper()
         total_pages = summary.get("total_pages", "0")
@@ -39,6 +40,7 @@ class MarkdownGenerator:
         # Generate markdown
         markdown = f"""## 📄 {file_name}
 
+- **ID:** `{file_id}`  
 - **Tipo:** {type_file}  
 - **Páginas:** {total_pages}  
 - **Capítulos:** {total_chapters}  
@@ -87,3 +89,4 @@ class MarkdownGenerator:
         self.logger.info("Markdown generated successfully")
         
         return full_markdown
+

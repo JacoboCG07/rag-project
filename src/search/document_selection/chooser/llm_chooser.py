@@ -153,7 +153,7 @@ class LLMDocumentChooser:
             tuple[str, str]: (prompt, system_prompt)
         """
         system_prompt = PromptLoader.read_file(
-            "src/search/select_documents/choose_documents/document_chooser_prompt.md"
+            "src/search/document_selection/chooser/prompt.md"
         )
         
         prompt = f"""# Consulta del usuario:
@@ -248,3 +248,4 @@ class LLMDocumentChooser:
         )
         
         return selected_summaries
+

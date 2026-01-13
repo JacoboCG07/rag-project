@@ -3,10 +3,12 @@ FireDocs: Módulo para extracción de datos de Milvus y generación de respuesta
 Búsqueda de documentos en Milvus
 """
 
-from .query_processor import QueryProcessor
-from .searcher import MilvusSearcher
+from .config import SearchPipelineConfig, SearchType, MilvusConfig
+from .pipeline import SearchPipeline
 
 __all__ = [
-    'QueryProcessor',
-    'MilvusSearcher'
+    'SearchPipelineConfig',
+    'SearchType',
+    'MilvusConfig',
+    'SearchPipeline'
 ]

@@ -13,8 +13,9 @@ if os.path.exists(libraries_path):
 try:
     from firemilvus import controlMilvus
 except ImportError:
-    from pymilvus import Collection, connections, db, utility
     controlMilvus = None
+
+from pymilvus import Collection, connections, db, utility
 
 
 class MilvusSearcher:
