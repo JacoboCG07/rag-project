@@ -16,8 +16,9 @@ load_dotenv()
 
 class SearchType(str, Enum):
     """Types of search available"""
-    NORMAL = "normal"  # Direct search in Milvus
+    SIMPLE = "simple"  # Direct search in Milvus
     WITH_SELECTION = "with_selection"  # Document selection + search in selected documents
+    WITH_SELECTION_AND_METADATA = "with_selection_and_metadata"  # Document selection + search with metadata filters
 
 
 class MilvusConfig(BaseModel):
@@ -36,8 +37,8 @@ class SearchPipelineConfig(BaseModel):
     
     # Search type
     search_type: SearchType = Field(
-        default=SearchType.NORMAL,
-        description="Type of search to perform: 'normal' for direct search, 'with_selection' for selection + search"
+        default=SearchType.SIMPLE,
+        description="Type of search: 'simple' (direct search), 'with_selection' (selection + search), 'with_selection_and_metadata' (selection + search with metadata)"
     )
     
     # Milvus configuration
@@ -76,8 +77,8 @@ class SearchPipelineConfig(BaseModel):
         """Validate configuration based on search type"""
         logger = get_logger(__name__)
         
-        # If search type is WITH_SELECTION, text_model is required
-        if self.search_type == SearchType.WITH_SELECTION:
+        # If search type requires document selection, text_model is required
+        if self.search_type in [SearchType.WITH_SELECTION, SearchType.WITH_SELECTION_AND_METADATA]:
             if self.text_model is None:
                 # Try to create a default OpenAI model if available
                 try:
@@ -85,10 +86,10 @@ class SearchPipelineConfig(BaseModel):
                     logger.info("Created default OpenAI text model for document selection")
                 except Exception as e:
                     logger.error(
-                        f"text_model is required when search_type='with_selection'. Error creating default: {str(e)}"
+                        f"text_model is required for search type '{self.search_type.value}'. Error creating default: {str(e)}"
                     )
                     raise ValueError(
-                        "text_model is required when search_type='with_selection'. "
+                        f"text_model is required for search type '{self.search_type.value}'. "
                         "Please provide a BaseTextModel instance."
                     )
         
