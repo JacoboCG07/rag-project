@@ -11,6 +11,13 @@ from .strategies import (
     DocumentSelectorSearchStrategy,
     DocumentSelectorMetadataSearchStrategy
 )
+from .models import (
+    DocumentSummary,
+    DocumentMetadata,
+    DocumentFilter,
+    SearchResult,
+    DocumentFilterWithDetails
+)
 
 __all__ = [
     'SearchPipelineConfig',
@@ -20,5 +27,10 @@ __all__ = [
     'SearchStrategy',
     'SimpleSearchStrategy',
     'DocumentSelectorSearchStrategy',
-    'DocumentSelectorMetadataSearchStrategy'
+    'DocumentSelectorMetadataSearchStrategy',
+    'DocumentSummary',
+    'DocumentMetadata',
+    'DocumentFilter',
+    'SearchResult',
+    'DocumentFilterWithDetails'
 ]

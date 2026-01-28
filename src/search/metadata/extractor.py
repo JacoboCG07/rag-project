@@ -54,37 +54,20 @@ class MetadataExtractor:
         
         Returns:
             str: Template del prompt.
+            
+        Raises:
+            FileNotFoundError: Si no se encuentra el archivo prompt.md.
         """
         prompt_path = os.path.join(os.path.dirname(__file__), "prompt.md")
         try:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 return f.read()
         except FileNotFoundError:
-            self.logger.warning(f"Prompt file not found: {prompt_path}")
-            return self._get_default_prompt()
-    
-    def _get_default_prompt(self) -> str:
-        """
-        Devuelve un prompt por defecto si no se encuentra el archivo.
-        
-        Returns:
-            str: Prompt por defecto.
-        """
-        return """Analiza la consulta del usuario y extrae metadata relevante.
-
-Documentos:
-{markdown_documents}
-
-Consulta: {user_query}
-
-Extrae para cada documento:
-- pages: Lista de números de página (o null)
-- chapters: Lista de capítulos (o null)
-- search_image: true/false si busca imágenes
-- num_image: Lista de números de imagen (o null)
-- type_file: Tipo de archivo
-
-Responde SOLO con JSON válido sin explicaciones."""
+            self.logger.error(f"Prompt file not found: {prompt_path}")
+            raise FileNotFoundError(
+                f"Prompt file not found: {prompt_path}. "
+                "The prompt.md file is required for metadata extraction."
+            )
     
     def extract(
         self,
@@ -123,13 +106,14 @@ Responde SOLO con JSON válido sin explicaciones."""
         )
         
         try:
-            # Construir prompt
-            prompt = self._build_prompt(user_query, markdown_documents, documents_info)
+            # Construir prompt y system_prompt
+            prompt, system_prompt = self._build_prompt(user_query, markdown_documents, documents_info)
             
-            # Llamar al LLM
+            # Llamar al LLM usando call_text_model (igual que LLMDocumentChooser)
             self.logger.debug("Calling LLM for metadata extraction")
-            response = self.text_model.generate(
+            response = self.text_model.call_text_model(
                 prompt=prompt,
+                system_prompt=system_prompt,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
             )
@@ -159,9 +143,13 @@ Responde SOLO con JSON válido sin explicaciones."""
         user_query: str,
         markdown_documents: str,
         documents_info: List[Dict[str, Any]]
-    ) -> str:
+    ) -> tuple[str, str]:
         """
-        Construye el prompt para el LLM.
+        Construye el prompt y system_prompt para el LLM.
+        
+        Similar a como lo hace LLMDocumentChooser:
+        - system_prompt: Instrucciones generales (del archivo prompt.md)
+        - prompt: Datos específicos (query + documentos)
         
         Args:
             user_query: Consulta del usuario.
@@ -169,15 +157,19 @@ Responde SOLO con JSON válido sin explicaciones."""
             documents_info: Información de documentos.
         
         Returns:
-            str: Prompt completo.
+            tuple[str, str]: (prompt, system_prompt)
         """
-        # TODO: Implementar construcción del prompt
-        # Reemplazar placeholders en self.prompt_template
-        prompt = self.prompt_template.format(
-            user_query=user_query,
-            markdown_documents=markdown_documents
-        )
-        return prompt
+        # system_prompt: Instrucciones generales del archivo prompt.md
+        system_prompt = self.prompt_template
+        
+        # prompt: Datos específicos (query + documentos)
+        prompt = f"""# Consulta del usuario:
+{user_query}
+
+# Documentos disponibles:
+{markdown_documents}
+"""
+        return prompt, system_prompt
     
     def _parse_response(
         self,
@@ -195,12 +187,6 @@ Responde SOLO con JSON válido sin explicaciones."""
             Dict[str, Dict]: Metadata parseada y validada.
         """
         try:
-            # TODO: Implementar parsing
-            # 1. Extraer JSON de la respuesta
-            # 2. Validar estructura
-            # 3. Validar valores contra documents_info
-            # 4. Devolver dict limpio
-            
             metadata_dict = json.loads(response)
             return metadata_dict
             

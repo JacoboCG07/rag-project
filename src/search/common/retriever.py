@@ -2,9 +2,10 @@
 Module for retrieving document summaries from Milvus
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from pymilvus import Collection
 from src.rag.processing.milvus.milvus_client import MilvusClient
+from src.search.models import DocumentSummary
 from src.utils import get_logger
 
 
@@ -72,23 +73,12 @@ class SummaryRetriever:
             extra={"collection_name": collection_name}
         )
 
-    def get_all_summaries(self) -> List[Dict[str, Any]]:
+    def get_all_summaries(self) -> List[DocumentSummary]:
         """
         Gets all summaries from the collection.
         
-        Excludes fields: text, file_name, type_file, total_pages, 
-        total_chapters, total_num_image
-        
         Returns:
-            List[Dict[str, Any]]: List of dictionaries with summary information.
-            Each dictionary contains:
-                - file_id: File identifier
-                - file_name: File name
-                - type_file: File type (PDF, etc.)
-                - total_pages: Total pages
-                - total_chapters: Total chapters
-                - total_num_image: Total images
-                - text: Summary text (description)
+            List[DocumentSummary]: List of document summaries with metadata.
         """
         self.logger.info("Getting all summaries from collection")
         
@@ -137,6 +127,84 @@ class SummaryRetriever:
             self.logger.error(
                 f"Error retrieving summaries: {str(e)}",
                 extra={"error": str(e)},
+                exc_info=True
+            )
+            raise
+
+    def get_summaries_by_file_ids(self, file_ids: List[str]) -> List[DocumentSummary]:
+        """
+        Gets summaries from the collection filtered by specific file_ids.
+        
+        Uses Milvus query with filter expression to retrieve only the requested documents.
+        
+        Args:
+            file_ids: List of file_id strings to retrieve.
+        
+        Returns:
+            List[DocumentSummary]: List of document summaries for the requested IDs.
+        """
+        if not file_ids:
+            self.logger.warning("No file_ids provided, returning empty list")
+            return []
+        
+        self.logger.info(
+            "Getting summaries by file_ids",
+            extra={"file_ids_count": len(file_ids), "file_ids": file_ids}
+        )
+        
+        try:
+            # Fields we want to retrieve
+            output_fields = [
+                "file_id",
+                "file_name", 
+                "type_file",
+                "total_pages",
+                "total_chapters", 
+                "total_num_image",
+                "text"
+            ]
+            
+            # Build filter expression for file_ids
+            if len(file_ids) == 1:
+                filter_expr = f'file_id == "{file_ids[0]}"'
+            else:
+                # Build: file_id in ["id1", "id2", ...]
+                file_ids_str = ", ".join([f'"{fid}"' for fid in file_ids])
+                filter_expr = f'file_id in [{file_ids_str}]'
+            
+            self.logger.debug(f"Querying Milvus with filter: {filter_expr}")
+            
+            # Query with filter
+            results = self.collection.query(
+                expr=filter_expr,
+                output_fields=output_fields,
+                limit=10000  # High limit to get all matching documents
+            )
+            
+            self.logger.info(
+                f"Retrieved {len(results)} summaries for {len(file_ids)} file_ids",
+                extra={"count": len(results), "requested_count": len(file_ids)}
+            )
+            
+            # Process results to structure them
+            summaries = []
+            for result in results:
+                summaries.append(DocumentSummary(
+                    file_id=result.get("file_id", ""),
+                    file_name=result.get("file_name", ""),
+                    type_file=result.get("type_file", ""),
+                    total_pages=result.get("total_pages", "0"),
+                    total_chapters=result.get("total_chapters", "0"),
+                    total_num_image=result.get("total_num_image", "0"),
+                    text=result.get("text", "")
+                ))
+            
+            return summaries
+            
+        except Exception as e:
+            self.logger.error(
+                f"Error retrieving summaries by file_ids: {str(e)}",
+                extra={"error": str(e), "file_ids": file_ids},
                 exc_info=True
             )
             raise

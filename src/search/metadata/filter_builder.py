@@ -84,78 +84,78 @@ class MetadataFilterBuilder:
         self.logger.debug(f"Filter built: {filter_expr}")
         return filter_expr
     
-    def build_combined_filter(
-        self,
-        metadata_dict: Dict[str, Dict[str, Any]]
-    ) -> str:
-        """
-        Construye un filtro combinado para múltiples documentos.
+    # def build_combined_filter(
+    #     self,
+    #     metadata_dict: Dict[str, Dict[str, Any]]
+    # ) -> str:
+    #     """
+    #     Construye un filtro combinado para múltiples documentos.
         
-        Combina los filtros de cada documento con OR.
+    #     Combina los filtros de cada documento con OR.
         
-        Args:
-            metadata_dict: Diccionario de metadata por file_id.
-                {
-                    "doc_001": {...},
-                    "doc_002": {...}
-                }
+    #     Args:
+    #         metadata_dict: Diccionario de metadata por file_id.
+    #             {
+    #                 "doc_001": {...},
+    #                 "doc_002": {...}
+    #             }
         
-        Returns:
-            str: Expresión de filtro combinada.
+    #     Returns:
+    #         str: Expresión de filtro combinada.
             
-            Ejemplo:
-            '(file_id == "doc_001" and pages in ["1","2"]) or 
-             (file_id == "doc_002" and chapters in ["cap1"])'
-        """
-        self.logger.info(
-            "Building combined filter",
-            extra={"num_documents": len(metadata_dict)}
-        )
+    #         Ejemplo:
+    #         '(file_id == "doc_001" and pages in ["1","2"]) or 
+    #          (file_id == "doc_002" and chapters in ["cap1"])'
+    #     """
+    #     self.logger.info(
+    #         "Building combined filter",
+    #         extra={"num_documents": len(metadata_dict)}
+    #     )
         
-        if not metadata_dict:
-            return ""
+    #     if not metadata_dict:
+    #         return ""
         
-        document_filters = []
+    #     document_filters = []
         
-        for file_id, metadata in metadata_dict.items():
-            doc_filter = self.build_filter_for_document(file_id, metadata)
-            if doc_filter:
-                # Envolver cada filtro de documento en paréntesis
-                document_filters.append(f"({doc_filter})")
+    #     for file_id, metadata in metadata_dict.items():
+    #         doc_filter = self.build_filter_for_document(file_id, metadata)
+    #         if doc_filter:
+    #             # Envolver cada filtro de documento en paréntesis
+    #             document_filters.append(f"({doc_filter})")
         
-        if not document_filters:
-            return ""
+    #     if not document_filters:
+    #         return ""
         
-        # Combinar con OR
-        combined_filter = " or ".join(document_filters)
+    #     # Combinar con OR
+    #     combined_filter = " or ".join(document_filters)
         
-        self.logger.info(f"Combined filter created with {len(document_filters)} documents")
-        return combined_filter
+    #     self.logger.info(f"Combined filter created with {len(document_filters)} documents")
+    #     return combined_filter
     
-    def build_filter_only_file_ids(
-        self,
-        file_ids: List[str]
-    ) -> str:
-        """
-        Construye un filtro simple solo con file_ids (sin metadata adicional).
+    # def build_filter_only_file_ids(
+    #     self,
+    #     file_ids: List[str]
+    # ) -> str:
+    #     """
+    #     Construye un filtro simple solo con file_ids (sin metadata adicional).
         
-        Args:
-            file_ids: Lista de IDs de documentos.
+    #     Args:
+    #         file_ids: Lista de IDs de documentos.
         
-        Returns:
-            str: Expresión de filtro.
+    #     Returns:
+    #         str: Expresión de filtro.
             
-            Ejemplo:
-            'file_id in ["doc_001", "doc_002", "doc_003"]'
-        """
-        if not file_ids:
-            return ""
+    #         Ejemplo:
+    #         'file_id in ["doc_001", "doc_002", "doc_003"]'
+    #     """
+    #     if not file_ids:
+    #         return ""
         
-        if len(file_ids) == 1:
-            return f'file_id == "{file_ids[0]}"'
+    #     if len(file_ids) == 1:
+    #         return f'file_id == "{file_ids[0]}"'
         
-        file_ids_str = ", ".join([f'"{fid}"' for fid in file_ids])
-        return f'file_id in [{file_ids_str}]'
+    #     file_ids_str = ", ".join([f'"{fid}"' for fid in file_ids])
+    #     return f'file_id in [{file_ids_str}]'
     
     def _build_pages_filter(self, pages: List[int]) -> str:
         """

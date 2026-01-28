@@ -2,7 +2,8 @@
 Module for generating markdown with document information
 """
 
-from typing import List, Dict, Any
+from typing import List
+from src.search.models import DocumentSummary
 from src.utils import get_logger
 
 
@@ -16,26 +17,24 @@ class MarkdownGenerator:
         """Initializes markdown generator."""
         self.logger = get_logger(__name__)
 
-    def generate_document_markdown(self, summary: Dict[str, Any]) -> str:
+    def generate_document_markdown(self, summary: DocumentSummary) -> str:
         """
         Generates markdown for a single document.
 
         Args:
-            summary: Dictionary with document information.
-                Must contain: file_name, type_file, total_pages,
-                total_chapters, total_num_image, text
+            summary: DocumentSummary with document information.
 
         Returns:
             str: Formatted markdown of the document.
         """
         # Extract summary information
-        file_id = summary.get("file_id", "unknown_id")
-        file_name = summary.get("file_name", "unnamed_document")
-        type_file = summary.get("type_file", "UNKNOWN").upper()
-        total_pages = summary.get("total_pages", "0")
-        total_chapters = summary.get("total_chapters", "0")
-        total_num_image = summary.get("total_num_image", "0")
-        description = summary.get("text", "No description available.")
+        file_id = summary.file_id
+        file_name = summary.file_name
+        type_file = summary.type_file.upper()
+        total_pages = summary.total_pages
+        total_chapters = summary.total_chapters
+        total_num_image = summary.total_num_image
+        description = summary.text
 
         # Generate markdown
         markdown = f"""## 📄 {file_name}
@@ -52,12 +51,12 @@ class MarkdownGenerator:
         
         return markdown
 
-    def generate_all_documents_markdown(self, summaries: List[Dict[str, Any]]) -> str:
+    def generate_all_documents_markdown(self, summaries: List[DocumentSummary]) -> str:
         """
         Generates markdown for all documents.
 
         Args:
-            summaries: List of dictionaries with document information.
+            summaries: List of DocumentSummary objects.
 
         Returns:
             str: Complete markdown with all documents.
