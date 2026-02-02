@@ -35,17 +35,17 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 "Please configure it in SearchPipelineConfig."
             )
         
-        # Initialize MilvusSearcher for document search
+        # Initialize MilvusSearcher for document search (misma colección, partición 'documents')
         self.searcher = MilvusSearcher(
             db_name=config.milvus.dbname,
-            collection_name=config.collection_name_documents,
+            collection_name=config.collection_name,
             alias=config.milvus.alias
         )
         
-        # Initialize DocumentSelector
+        # Initialize DocumentSelector (misma colección, partición 'summaries')
         self.document_selector = DocumentSelector(
             dbname=config.milvus.dbname,
-            collection_name=config.collection_name_summaries,
+            collection_name=config.collection_name,
             text_model=config.text_model,
             uri=config.milvus.uri,
             token=config.milvus.token,
@@ -53,10 +53,10 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
             port=config.milvus.port
         )
         
-        # Initialize MetadataSelector (uses same text_model)
+        # Initialize MetadataSelector (misma colección, partición 'summaries')
         self.metadata_selector = MetadataSelector(
             dbname=config.milvus.dbname,
-            collection_name=config.collection_name_summaries,
+            collection_name=config.collection_name,
             text_model=config.text_model,
             max_tokens=config.chooser_max_tokens,
             temperature=config.chooser_temperature,
@@ -69,8 +69,9 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
         self.logger.info(
             "DocumentSelectorMetadataSearchStrategy initialized",
             extra={
-                "collection_documents": config.collection_name_documents,
-                "collection_summaries": config.collection_name_summaries,
+                "collection_name": config.collection_name,
+                "partition_documents": config.PARTITION_DOCUMENTS,
+                "partition_summaries": config.PARTITION_SUMMARIES,
                 "search_limit": config.search_limit
             }
         )
@@ -175,10 +176,11 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                             f"Searching document {file_id} with filter: {doc_filter}"
                         )
                         
-                        # Search with this document's filter
+                        # Search with this document's filter in the 'documents' partition
                         doc_results = self.searcher.search(
                             query_embedding=query_embedding,
                             limit=self.config.search_limit,  # Limit per document
+                            partition_names=[self.config.PARTITION_DOCUMENTS],
                             filter_expr=doc_filter
                         )
                         
@@ -218,6 +220,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                             doc_results = self.searcher.search(
                                 query_embedding=query_embedding,
                                 limit=self.config.search_limit,
+                                partition_names=[self.config.PARTITION_DOCUMENTS],
                                 filter_expr=doc_filter
                             )
                             all_results.extend(doc_results)
@@ -240,6 +243,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 all_results = self.searcher.search(
                     query_embedding=query_embedding,
                     limit=self.config.search_limit,
+                    partition_names=[self.config.PARTITION_DOCUMENTS],
                     filter_expr=combined_filter
                 )
             

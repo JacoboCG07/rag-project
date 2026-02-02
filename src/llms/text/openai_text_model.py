@@ -60,7 +60,7 @@ class OpenAITextModel(BaseTextModel):
         self.client = OpenAI(api_key=self.api_key)
         self.logger = get_logger(__name__)
         
-        self.logger.info(
+        self.logger.debug(
             "Initializing OpenAITextModel",
             extra={
                 "model": model,
@@ -173,7 +173,7 @@ class OpenAITextModel(BaseTextModel):
                 if hasattr(usage, 'total_tokens'):
                     usage_info['total_tokens'] = usage.total_tokens
 
-            self.logger.info(
+            self.logger.debug(
                 "OpenAI Text API call completed successfully",
                 extra={
                     "model": self.model,

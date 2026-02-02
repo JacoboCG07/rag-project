@@ -9,11 +9,18 @@ Documentos a subir:
 - cv_candidate_1.pdf
 - cv_candidate_2.pdf
 - cv_candidate_3.pdf
+- cv_candidate_4.pdf
 """
 
 import os
 import sys
 from pathlib import Path
+
+# Configurar codificación UTF-8 para Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Añadir el directorio raíz al path para imports
 root_dir = Path(__file__).parent.parent.parent
@@ -36,49 +43,28 @@ def upload_documents():
     # Ruta a la carpeta de datos
     data_dir = Path(__file__).parent / "data"
     
-    # Lista de documentos esperados
+    # Lista de documentos a procesar
     expected_files = [
         "job_proposal.pdf",
         "cv_candidate_1.pdf",
         "cv_candidate_2.pdf",
-        "cv_candidate_3.pdf"
+        "cv_candidate_3.pdf",
+        "cv_candidate_4.pdf"
     ]
     
-    # Verificar que existen los archivos
-    print("\n📋 Verificando archivos...")
-    missing_files = []
-    existing_files = []
-    
-    for filename in expected_files:
-        file_path = data_dir / filename
-        if file_path.exists():
-            existing_files.append(file_path)
-            print(f"  ✓ {filename}")
-        else:
-            missing_files.append(filename)
-            print(f"  ✗ {filename} - NO ENCONTRADO")
-    
-    if missing_files:
-        print(f"\n⚠️  ADVERTENCIA: Faltan {len(missing_files)} archivo(s):")
-        for f in missing_files:
-            print(f"     - {f}")
-        print("\nPor favor, añade los archivos faltantes a la carpeta 'data/'")
-        
-        response = input("\n¿Deseas continuar con los archivos disponibles? (s/n): ")
-        if response.lower() != 's':
-            print("Subida cancelada.")
-            return
-    
-    if not existing_files:
-        print("\n❌ No hay archivos para procesar. Añade los PDFs a la carpeta 'data/'")
-        return
+    # Obtener rutas de los archivos
+    existing_files = [data_dir / filename for filename in expected_files]
     
     print(f"\n🚀 Procesando {len(existing_files)} documento(s)...\n")
+    
+    # Nombre de la colección para este ejemplo
+    # La colección tendrá dos particiones: 'documents' y 'summaries'
+    collection_name = "cv_recruitment"
     
     try:
         # Configurar el RAG Pipeline
         # Nota: Ajusta la configuración según tus necesidades
-        config = RAGPipelineConfig()
+        config = RAGPipelineConfig(collection_name=collection_name)
         
         with RAGPipeline(config=config) as pipeline:
             successful = 0
@@ -87,18 +73,27 @@ def upload_documents():
             for i, file_path in enumerate(existing_files, 1):
                 print(f"\n{'─' * 80}")
                 print(f"[{i}/{len(existing_files)}] Procesando: {file_path.name}")
+                print(f"Colección: {collection_name}")
+                print(f"  - Partición documentos: documents")
+                print(f"  - Partición resúmenes: summaries")
                 print('─' * 80)
                 
                 try:
                     # Procesar e indexar el documento
-                    result = pipeline.process_document(str(file_path))
+                    # Los documentos van a la partición 'documents' y los resúmenes a 'summaries'
+                    success, message, result_info = pipeline.process_single_file(
+                        file_path=str(file_path),
+                        extract_process_images=False
+                    )
                     
-                    print(f"✓ {file_path.name} procesado correctamente")
-                    if result:
-                        print(f"  - Chunks generados: {result.get('chunks_count', 'N/A')}")
-                        print(f"  - File ID: {result.get('file_id', 'N/A')}")
-                    
-                    successful += 1
+                    if success:
+                        print(f"✓ {file_path.name} procesado correctamente")
+                        print(f"  - File ID: {result_info.get('file_id', 'N/A')}")
+                        print(f"  - Mensaje: {message}")
+                        successful += 1
+                    else:
+                        print(f"✗ Error procesando {file_path.name}: {message}")
+                        failed += 1
                     
                 except Exception as e:
                     logger.error(f"Error procesando {file_path.name}: {str(e)}", exc_info=True)
@@ -114,6 +109,9 @@ def upload_documents():
             
             if successful > 0:
                 print("\n✅ Los documentos están listos para búsqueda.")
+                print(f"   Colección utilizada: {collection_name}")
+                print(f"   - Partición documentos: documents")
+                print(f"   - Partición resúmenes: summaries")
                 print("   Ejecuta 'python run_example.py' para probar las búsquedas.")
             
     except Exception as e:
@@ -134,16 +132,8 @@ def main():
     print("ℹ️  Asegúrate de que Milvus está corriendo:")
     print("   docker-compose up -d\n")
     
-    response = input("¿Milvus está corriendo? (s/n): ")
-    if response.lower() != 's':
-        print("\nPor favor, inicia Milvus primero:")
-        print("  cd ../../  # Ir a la raíz del proyecto")
-        print("  docker-compose up -d")
-        return
-    
     upload_documents()
 
 
 if __name__ == "__main__":
     main()
-

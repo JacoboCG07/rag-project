@@ -3,7 +3,7 @@ Example usage of RAG Pipeline with configuration
 """
 from src.rag.config import RAGPipelineConfig, SearchPipelineConfig, MilvusConfig
 from src.rag.rag_pipeline import RAGPipeline
-from src.rag.processing.embeddings.openai_embedder import OpenAIEmbedder
+from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 
 # Example 1: Using default configuration (from environment variables)
 def example_default_config():

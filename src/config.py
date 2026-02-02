@@ -22,4 +22,3 @@ EMBEDDING_DIM = 1536  # Dimensión para text-embedding-ada-002
 # Configuración de chunking
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", "2000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
-

@@ -4,7 +4,8 @@ Uses text models to generate document summaries
 """
 
 from typing import Optional
-from llms.text import BaseTextModel, OpenAITextModel
+from pathlib import Path
+from src.llms.text import BaseTextModel, OpenAITextModel
 from src.utils.utils import PromptLoader
 from src.utils import get_logger
 
@@ -130,6 +131,10 @@ class LLMSummarizer:
             str: Default prompt template.
         """
 
-        system_prompt = PromptLoader.read_file("src/rag/processing/summarizer/summarizer_prompt.md")
+        # Obtener la ruta del archivo de prompt relativa al directorio del módulo
+        # __file__ apunta a este archivo en src/rag/processing/summarizer/llm_summarizer.py
+        # El prompt está en el mismo directorio que este archivo
+        prompt_path = Path(__file__).parent / "summarizer_prompt.md"
+        system_prompt = PromptLoader.read_file(str(prompt_path))
         return text, system_prompt
 

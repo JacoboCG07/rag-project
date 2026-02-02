@@ -61,7 +61,7 @@ class OpenAIVisionModel(BaseVisionModel):
         self.client = OpenAI(api_key=self.api_key)
         self.logger = get_logger(__name__)
         
-        self.logger.info(
+        self.logger.debug(
             "Initializing OpenAIVisionModel",
             extra={
                 "model": model,
@@ -175,7 +175,7 @@ class OpenAIVisionModel(BaseVisionModel):
                 if hasattr(usage, 'total_tokens'):
                     usage_info['total_tokens'] = usage.total_tokens
 
-            self.logger.info(
+            self.logger.debug(
                 "OpenAI Vision API call completed successfully",
                 extra={
                     "model": self.model,

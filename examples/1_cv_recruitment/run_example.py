@@ -24,7 +24,7 @@ sys.path.insert(0, str(root_dir))
 from llms.text import OpenAITextModel
 from src.search.config import SearchPipelineConfig, SearchType
 from src.search.pipeline import SearchPipeline
-from rag.processing.embeddings.openai_embedder import OpenAIEmbedder
+from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -37,10 +37,10 @@ def setup_pipeline():
     text_model = OpenAITextModel(model="gpt-4o-mini")
     
     # Configurar pipeline con estrategia WITH_SELECTION
+    # Usa la misma colección que se usó para subir los documentos
     config = SearchPipelineConfig(
         search_type=SearchType.WITH_SELECTION,
-        collection_name_documents="documents",
-        collection_name_summaries="summaries",
+        collection_name="cv_recruitment",  # Misma colección que en upload_documents.py
         text_model=text_model,
         search_limit=10,
         chooser_max_tokens=500,
@@ -159,4 +159,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
 

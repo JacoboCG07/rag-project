@@ -25,14 +25,15 @@ class SimpleSearchStrategy(SearchStrategy):
         # Initialize MilvusSearcher
         self.searcher = MilvusSearcher(
             db_name=config.milvus.dbname,
-            collection_name=config.collection_name_documents,
+            collection_name=config.collection_name,
             alias=config.milvus.alias
         )
         
         self.logger.info(
             "SimpleSearchStrategy initialized",
             extra={
-                "collection": config.collection_name_documents,
+                "collection": config.collection_name,
+                "partition": config.PARTITION_DOCUMENTS,
                 "search_limit": config.search_limit
             }
         )
@@ -69,6 +70,10 @@ class SimpleSearchStrategy(SearchStrategy):
             self.searcher.connect()
             
             # Perform search
+            # Si no se especifican particiones, buscar en la partición 'documents' por defecto
+            if partition_names is None:
+                partition_names = [self.config.PARTITION_DOCUMENTS]
+            
             results = self.searcher.search(
                 query_embedding=query_embedding,
                 limit=self.config.search_limit,

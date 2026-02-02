@@ -4,7 +4,7 @@ Handles generation and uploading of document summaries
 """
 
 from typing import Dict, List, Any, Optional, Tuple, Callable
-from rag.extractors.base import ExtractionResult
+from ...extractors.base.types import ExtractionResult
 from ..milvus.milvus_client import MilvusClient
 from src.utils import get_logger
 

@@ -43,8 +43,13 @@ class SearchPipelineConfig(BaseModel):
     
     # Milvus configuration
     milvus: MilvusConfig = Field(default_factory=MilvusConfig)
-    collection_name_documents: str = os.getenv("MILVUS_COLLECTION_NAME_DOCUMENTS", "documents")
-    collection_name_summaries: str = os.getenv("MILVUS_COLLECTION_NAME_SUMMARIES", "summaries")
+    collection_name: str = Field(
+        default="default_collection",
+        description="Nombre de la colección. Cada colección tiene dos particiones: 'documents' y 'summaries'"
+    )
+    # Particiones fijas dentro de la colección
+    PARTITION_DOCUMENTS: str = "documents"
+    PARTITION_SUMMARIES: str = "summaries"
     
     # Search parameters
     search_limit: int = Field(
@@ -97,8 +102,9 @@ class SearchPipelineConfig(BaseModel):
             "SearchPipelineConfig initialized",
             extra={
                 "search_type": self.search_type.value,
-                "collection_documents": self.collection_name_documents,
-                "collection_summaries": self.collection_name_summaries,
+                "collection_name": self.collection_name,
+                "partition_documents": self.PARTITION_DOCUMENTS,
+                "partition_summaries": self.PARTITION_SUMMARIES,
                 "search_limit": self.search_limit,
                 "has_text_model": self.text_model is not None
             }

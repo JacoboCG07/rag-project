@@ -9,7 +9,6 @@ from pymilvus import CollectionSchema
 from .base import SchemaProvider
 from .exceptions import SchemaNotFoundError
 from .strategies.rag_schema import DocumentSchemaProvider
-from .strategies.summary_schema import SummarySchemaProvider
 
 
 class Schemas:
@@ -21,7 +20,6 @@ class Schemas:
 
     _registry: Dict[str, Type[SchemaProvider]] = {
         "document": DocumentSchemaProvider,
-        "summary": SummarySchemaProvider,
     }
 
     def get_schema(self, *, name_schema: str, embedding_dim: int = 1536) -> CollectionSchema:
@@ -29,7 +27,7 @@ class Schemas:
         Returns the CollectionSchema corresponding to the given name.
 
         Args:
-            name_schema: Schema name ('document', 'summary').
+            name_schema: Schema name ('document').
             embedding_dim: Embedding vector dimension (default 1536).
 
         Returns:
