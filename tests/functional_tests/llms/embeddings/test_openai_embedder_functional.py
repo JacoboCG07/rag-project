@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 
 # Add src to path
 # Calculate project root: go up from test file to project root
-# test_openai_embedder_functional.py -> embeddings/ -> processing/ -> rag/ -> functional_tests/ -> tests/ -> project_root
+# test_openai_embedder_functional.py -> embeddings/ -> llms/ -> functional_tests/ -> tests/ -> project_root
 _current_file = Path(__file__).resolve()
-project_root = _current_file.parent.parent.parent.parent.parent.parent
+project_root = _current_file.parent.parent.parent.parent.parent
 src_path = project_root / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
@@ -24,8 +24,8 @@ env_path = project_root / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-from rag.processing.embeddings.openai_embedder import OpenAIEmbedder, OPENAI_AVAILABLE
-from rag.processing.embeddings.base_embedder import RateLimitError
+from src.llms.embeddings.openai_embedder import OpenAIEmbedder, OPENAI_AVAILABLE
+from src.llms.embeddings.base_embedder import RateLimitError
 
 
 # Skip all tests if OpenAI package is not available
@@ -66,7 +66,7 @@ class TestOpenAIEmbedderFunctional:
         assert all(isinstance(x, float) for x in embedding)
         
         # Verify dimensions match expected model dimensions
-        expected_dimensions = openai_embedder.get_dimensions()
+        expected_dimensions = openai_embedder.dimensions
         assert len(embedding) == expected_dimensions
         
         # Verify token count is provided when count_tokens=True
@@ -135,7 +135,7 @@ class TestOpenAIEmbedderFunctional:
             assert result is not None
             embedding, token_count = result
             assert isinstance(embedding, list)
-            assert len(embedding) == openai_embedder.get_dimensions()
+            assert len(embedding) == openai_embedder.dimensions
             assert token_count is not None
     
     def test_generate_embeddings_batch_filters_empty_texts(self, openai_embedder):
@@ -159,33 +159,33 @@ class TestOpenAIEmbedderFunctional:
         assert results[2] is None
         assert results[3] is None
     
-    def test_get_dimensions_text_embedding_3_small(self):
-        """Test get_dimensions with text-embedding-3-small model"""
+    def test_dimensions_text_embedding_3_small(self):
+        """Test dimensions with text-embedding-3-small model"""
         if not has_openai_api_key():
             pytest.skip("OPENAI_API_KEY environment variable not set")
         
         embedder = OpenAIEmbedder(model="text-embedding-3-small")
-        dimensions = embedder.get_dimensions()
+        dimensions = embedder.dimensions
         
         assert dimensions == 1536
     
-    def test_get_dimensions_text_embedding_3_large(self):
-        """Test get_dimensions with text-embedding-3-large model"""
+    def test_dimensions_text_embedding_3_large(self):
+        """Test dimensions with text-embedding-3-large model"""
         if not has_openai_api_key():
             pytest.skip("OPENAI_API_KEY environment variable not set")
         
         embedder = OpenAIEmbedder(model="text-embedding-3-large")
-        dimensions = embedder.get_dimensions()
+        dimensions = embedder.dimensions
         
         assert dimensions == 3072
     
-    def test_get_dimensions_text_embedding_ada_002(self):
-        """Test get_dimensions with text-embedding-ada-002 model"""
+    def test_dimensions_text_embedding_ada_002(self):
+        """Test dimensions with text-embedding-ada-002 model"""
         if not has_openai_api_key():
             pytest.skip("OPENAI_API_KEY environment variable not set")
         
         embedder = OpenAIEmbedder(model="text-embedding-ada-002")
-        dimensions = embedder.get_dimensions()
+        dimensions = embedder.dimensions
         
         assert dimensions == 1536
     
@@ -210,7 +210,7 @@ class TestOpenAIEmbedderFunctional:
         embedding, token_count = openai_embedder.generate_embedding(text=text)
         
         assert isinstance(embedding, list)
-        assert len(embedding) == openai_embedder.get_dimensions()
+        assert len(embedding) == openai_embedder.dimensions
         assert token_count is not None
         assert token_count > 0
     
@@ -231,3 +231,4 @@ class TestOpenAIEmbedderFunctional:
         
         # Synonyms should have high similarity
         assert similarity > 0.6, f"Semantic similarity too low: {similarity}"
+
