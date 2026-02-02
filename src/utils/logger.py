@@ -2,13 +2,14 @@
 Centralized logging module for the RAG project
 Uses Loguru for logging with sinks to console and MongoDB
 """
-from typing import Optional, Dict, Any
-from loguru import logger
-import sys
+
 import os
+import sys
+from loguru import logger
 from datetime import datetime
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from typing import Optional, Dict, Any
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 # Load environment variables
@@ -33,7 +34,7 @@ def _initialize_logger() -> None:
     # Remove Loguru's default handler
     logger.remove()
     
-    # Console sink - INFO level
+    # Console sink - INFO level (shows INFO and above in console)
     logger.add(
         sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
@@ -43,9 +44,9 @@ def _initialize_logger() -> None:
         diagnose=True
     )
     
-    # MongoDB sink - INFO level or higher
+    # MongoDB sink - configurable level (default: WARNING, only warnings and errors)
+    # Set MONGO_LOG_LEVEL env var to change: DEBUG, INFO, WARNING, ERROR, CRITICAL
     _setup_mongodb_sink()
-    
     _logger_initialized = True
 
 
@@ -116,54 +117,72 @@ def _mongodb_sink(message: Any) -> None:
             else:
                 file_name = str(file_obj)
         
-        log_document: Dict[str, Any] = {
-            "timestamp": timestamp,
-            "level": record["level"].name,
-            "message": record["message"],
-            "module": record.get("name", "unknown"),
+        # Group code-related information in a nested dictionary
+        code_info: Dict[str, Any] = {
             "function": record.get("function", "unknown"),
-            "line": record.get("line", 0),
+            "module": record.get("name", "unknown"),
             "file": file_name,
+            "line": record.get("line", 0),
             "process_id": process_id,
-            "thread_id": thread_id,
-            "job_id": job_id,
+            "thread_id": thread_id
         }
         
-        # Add exception if it exists
+        log_document: Dict[str, Any] = {
+            "timestamp": timestamp,
+            "job_id": job_id,
+            "level": record["level"].name,
+            "message": record["message"],
+            "code_info": code_info
+        }
+        
+        # Add error_info if exception exists
         if record.get("exception") is not None:
             exception = record["exception"]
-            exception_info = {}
+            error_info = {}
             
             # Extract exception type
             if hasattr(exception, "type") and exception.type:
-                exception_info["type"] = exception.type.__name__
+                error_info["type"] = exception.type.__name__
             else:
-                exception_info["type"] = None
+                error_info["type"] = None
             
             # Extract exception value
             if hasattr(exception, "value") and exception.value:
-                exception_info["value"] = str(exception.value)
+                error_info["value"] = str(exception.value)
             else:
-                exception_info["value"] = None
+                error_info["value"] = None
             
             # Extract traceback (convert to string if necessary)
             if hasattr(exception, "traceback") and exception.traceback:
                 # Traceback can be a Traceback object, convert it to string
                 if hasattr(exception.traceback, "format"):
-                    exception_info["traceback"] = exception.traceback.format()
+                    error_info["traceback"] = exception.traceback.format()
                 else:
-                    exception_info["traceback"] = str(exception.traceback)
+                    error_info["traceback"] = str(exception.traceback)
             else:
-                exception_info["traceback"] = None
+                error_info["traceback"] = None
             
-            log_document["exception"] = exception_info
+            log_document["error_info"] = error_info
         
-        # Add additional fields if they exist, excluding job_id
+        # Add additional fields if they exist, excluding job_id and name (already in code_info)
         if extra_dict and isinstance(extra_dict, dict):
-            # Create a copy without job_id so it doesn't appear duplicated
-            extra_without_job_id = {k: v for k, v in extra_dict.items() if k != "job_id"}
-            if extra_without_job_id:  # Only add if there are other fields besides job_id
-                log_document["extra"] = extra_without_job_id
+            # Flatten nested extra structure if it exists
+            flattened_extra = {}
+            for k, v in extra_dict.items():
+                # Skip job_id (already at top level)
+                if k == "job_id":
+                    continue
+                # Skip name (already in code_info.module)
+                if k == "name":
+                    continue
+                # If there's a nested "extra" dict, merge its contents
+                if k == "extra" and isinstance(v, dict):
+                    flattened_extra.update(v)
+                else:
+                    flattened_extra[k] = v
+            
+            if flattened_extra:  # Only add if there are fields
+                log_document["extra"] = flattened_extra
         
         # Insert into MongoDB
         _mongo_collection.insert_one(log_document)
@@ -231,11 +250,25 @@ def _setup_mongodb_sink() -> None:
         _mongo_collection.create_index("timestamp")
         _mongo_collection.create_index("level")
         _mongo_collection.create_index([("timestamp", -1), ("level", 1)])
+        # Create indexes on code_info fields for better querying
+        _mongo_collection.create_index("code_info.module")
+        _mongo_collection.create_index("code_info.process_id")
+        _mongo_collection.create_index("code_info.thread_id")
+        # Create indexes on error_info fields for better error querying
+        _mongo_collection.create_index("error_info.type")
         
-        # Add MongoDB sink with INFO level or higher
+        # Get MongoDB log level from environment variable (default: WARNING)
+        # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+        # WARNING means only warnings and errors are saved to MongoDB
+        mongo_log_level = os.getenv("MONGO_LOG_LEVEL", "WARNING").upper()
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if mongo_log_level not in valid_levels:
+            mongo_log_level = "WARNING"  # Fallback to WARNING if invalid
+        
+        # Add MongoDB sink with configurable level
         logger.add(
             _mongodb_sink,
-            level="INFO",
+            level=mongo_log_level,
             format="{time} | {level} | {name}:{function}:{line} - {message}",
             backtrace=True,
             diagnose=True

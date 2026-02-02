@@ -3,11 +3,10 @@ LLM-based image describer implementation
 Uses vision models to generate image descriptions
 """
 
-from typing import Optional, Union, List
-from llms.vision import BaseVisionModel
-from src.utils.utils import PromptLoader
 from src.utils import get_logger
-
+from typing import Optional, Union, List
+from src.utils.utils import PromptLoader
+from src.llms.vision import BaseVisionModel
 
 class LLMImageDescriber:
     """

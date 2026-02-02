@@ -19,8 +19,7 @@ class DocumentProcessor:
         self,
         *,
         dbname: str,
-        collection_name_documents: str,
-        collection_name_summaries: str,
+        collection_name: str,
         generate_embeddings_func: Callable[[str], Any],
         generate_summary_func: Callable[[str], str] = None,
         describe_image_func: Callable[[str], str] = None,
@@ -32,12 +31,12 @@ class DocumentProcessor:
         port: Optional[str] = None
     ):
         """
-        Initializes the document processor with Milvus clients.
+        Initializes the document processor with Milvus client.
+        Usa una sola colección con dos particiones fijas: 'documents' y 'summaries'.
 
         Args:
             dbname: Database name in Milvus.
-            collection_name_documents: Collection name for full documents.
-            collection_name_summaries: Collection name for document summaries.
+            collection_name: Nombre de la colección. Tendrá dos particiones: 'documents' y 'summaries'.
             generate_embeddings_func: Function to generate embeddings (must receive text and return embedding).
             generate_summary_func: Function to generate summary (must receive full text and return summary string). Optional.
             describe_image_func: Function to describe image (must receive base64 image and return description string). Optional.
@@ -49,11 +48,13 @@ class DocumentProcessor:
             port: Milvus port (optional).
         """
 
-        self.milvus_client_documents = MilvusClient(
+        # Usar una sola colección para documentos y resúmenes
+        # Las particiones fijas serán 'documents' y 'summaries'
+        self.milvus_client = MilvusClient(
             dbname=dbname,
-            collection_name=collection_name_documents,
+            collection_name=collection_name,
             alias=alias,
-            name_schema="document",
+            name_schema="document",  # Usamos el schema de documento para ambos
             embedding_dim=embedding_dim,
             uri=uri,
             token=token,
@@ -61,17 +62,9 @@ class DocumentProcessor:
             port=port
         )
         
-        self.milvus_client_summaries = MilvusClient(
-            dbname=dbname,
-            collection_name=collection_name_summaries,
-            alias=alias,
-            name_schema="summary",
-            embedding_dim=embedding_dim,
-            uri=uri,
-            token=token,
-            host=host,
-            port=port
-        )
+        # Particiones fijas
+        self.PARTITION_DOCUMENTS = "documents"
+        self.PARTITION_SUMMARIES = "summaries"
 
         # Store embedding and summary generation functions
         self.generate_embeddings_func = generate_embeddings_func
@@ -83,8 +76,9 @@ class DocumentProcessor:
             "Initializing DocumentProcessor",
             extra={
                 "dbname": dbname,
-                "collection_name_documents": collection_name_documents,
-                "collection_name_summaries": collection_name_summaries,
+                "collection_name": collection_name,
+                "partition_documents": self.PARTITION_DOCUMENTS,
+                "partition_summaries": self.PARTITION_SUMMARIES,
                 "embedding_dim": embedding_dim,
                 "has_generate_summary_func": generate_summary_func is not None,
                 "has_describe_image_func": describe_image_func is not None
@@ -93,7 +87,7 @@ class DocumentProcessor:
 
         # Initialize DocumentUploader with embedding function and image description function
         self._document_uploader = DocumentUploader(
-            milvus_client=self.milvus_client_documents,
+            milvus_client=self.milvus_client,
             generate_embeddings_func=generate_embeddings_func,
             describe_image_func=describe_image_func
         )
@@ -101,7 +95,7 @@ class DocumentProcessor:
         # Initialize SummaryProcessor only if generate_summary_func is provided
         if generate_summary_func:
             self._summary_processor = SummaryProcessor(
-                milvus_client=self.milvus_client_summaries,
+                milvus_client=self.milvus_client,
                 generate_summary_func=generate_summary_func,
                 generate_embeddings_func=generate_embeddings_func
             )
@@ -117,19 +111,18 @@ class DocumentProcessor:
         *,
         file_id: str,
         document_data: ExtractionResult,
-        process_images: bool = False,
-        partition_name: str
+        process_images: bool = False
     ) -> Tuple[bool, str]:
         """
         Processes document data and inserts it into Milvus collections.
         Always inserts full documents, optionally processes images and generates summaries.
+        Usa las particiones fijas 'documents' y 'summaries'.
 
         Args:
             file_id: Unique file ID.
             document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData),
                           and 'metadata' (BaseFileMetadata or subclass).
             process_images: Whether to process and vectorize images (default False).
-            partition_name: Partition name for Milvus.
 
         Returns:
             Tuple[bool, str]: (success, message).
@@ -147,7 +140,8 @@ class DocumentProcessor:
                     "file_id": file_id,
                     "file_name": file_name,
                     "process_images": process_images,
-                    "partition_name": partition_name,
+                    "partition_documents": self.PARTITION_DOCUMENTS,
+                    "partition_summaries": self.PARTITION_SUMMARIES,
                     "has_summary_processor": self._summary_processor is not None
                 }
             )
@@ -156,7 +150,7 @@ class DocumentProcessor:
                 document_data=document_data,
                 file_id=file_id,
                 process_images=process_images,
-                partition_name=partition_name
+                partition_name=self.PARTITION_DOCUMENTS
             )
 
             if not success_doc:
@@ -184,7 +178,7 @@ class DocumentProcessor:
                 success_summary, message_summary = self._summary_processor.process_and_upload_summary(
                     document_data=document_data,
                     file_id=file_id,
-                    partition_name=partition_name
+                    partition_name=self.PARTITION_SUMMARIES
                 )
 
                 if not success_summary:
@@ -232,7 +226,6 @@ class DocumentProcessor:
                 extra={
                     "file_id": file_id,
                     "file_name": file_name,
-                    "partition_name": partition_name,
                     "error_type": type(e).__name__
                 },
                 exc_info=True
@@ -240,11 +233,10 @@ class DocumentProcessor:
             return False, error_msg
 
     def close(self) -> None:
-        """Closes connections with both Milvus collections."""
+        """Closes connections with Milvus collection."""
         self.logger.info("Closing DocumentProcessor connections")
         try:
-            self.milvus_client_documents.close()
-            self.milvus_client_summaries.close()
+            self.milvus_client.close()
             self.logger.info("DocumentProcessor connections closed successfully")
         except Exception as e:
             self.logger.error(

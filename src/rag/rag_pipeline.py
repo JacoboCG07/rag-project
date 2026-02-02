@@ -39,9 +39,8 @@ class RAGPipeline:
             "Initializing RAG Pipeline",
             extra={
                 "milvus_db": config.milvus.dbname,
-                "collection_documents": config.collection_name_documents,
-                "collection_summaries": config.collection_name_summaries,
-                "embedding_dim": config.embedding_dim,
+                "collection_name": config.collection_name,
+                "embedding_dim": config.embedder.dimensions,
                 "milvus_host": config.milvus.host or "default",
                 "milvus_port": config.milvus.port or "default",
                 "chunk_size": config.chunk_size,
@@ -54,13 +53,12 @@ class RAGPipeline:
         try:
             self.document_processor = DocumentProcessor(
                 dbname=config.milvus.dbname,
-                collection_name_documents=config.collection_name_documents,
-                collection_name_summaries=config.collection_name_summaries,
+                collection_name=config.collection_name,
                 generate_embeddings_func=config.generate_embeddings_func,
                 generate_summary_func=config.generate_summary_func,
                 describe_image_func=config.describe_image_func,
                 alias=config.milvus.alias,
-                embedding_dim=config.embedding_dim,
+                embedding_dim=config.embedder.dimensions,
                 uri=config.milvus.uri,
                 token=config.milvus.token,
                 host=config.milvus.host,
@@ -83,17 +81,17 @@ class RAGPipeline:
         *,
         file_path: str,
         extract_process_images: Optional[bool] = None,
-        partition_name: str,
         job_id: Optional[str] = None
 
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Processes a single file and inserts it into Milvus.
+        Los documentos se insertan en la partición 'documents' y los resúmenes en 'summaries'
+        de la colección especificada en la configuración.
 
         Args:
             file_path: Path to the file to process.
             extract_process_images: Whether to extract images from PDFs (overrides config default).
-            partition_name: Name of the partition to use.
             job_id: Optional job identifier for tracking logs. If provided, will be included in all logs.
 
         Returns:
@@ -112,7 +110,7 @@ class RAGPipeline:
             extra={
                 "file_path": str(file_path_obj),
                 "file_id": file_id,
-                "partition_name": partition_name,
+                "collection_name": self.config.collection_name,
                 "extract_process_images": extract_process_images
             }
         )
@@ -155,14 +153,13 @@ class RAGPipeline:
                 extra={
                     "file_id": file_id,
                     "file_name": file_name,
-                    "partition_name": partition_name
+                    "collection_name": self.config.collection_name
                 }
             )
             success, message = self.document_processor.process_and_insert(
                 file_id=file_id,
                 document_data=document_data,
-                process_images=extract_process_images,
-                partition_name=partition_name
+                process_images=extract_process_images
             )
             
             # Prepare result info
@@ -178,7 +175,7 @@ class RAGPipeline:
                     extra={
                         "file_id": file_id,
                         "file_name": file_name,
-                        "partition_name": partition_name,
+                        "collection_name": self.config.collection_name,
                         "message": message
                     }
                 )
@@ -188,7 +185,7 @@ class RAGPipeline:
                     extra={
                         "file_id": file_id,
                         "file_name": file_name,
-                        "partition_name": partition_name,
+                        "collection_name": self.config.collection_name,
                         "error_message": message
                     }
                 )
@@ -201,7 +198,7 @@ class RAGPipeline:
                 extra={
                     "file_path": str(file_path_obj),
                     "file_id": file_id,
-                    "partition_name": partition_name,
+                    "collection_name": self.config.collection_name,
                     "error_type": type(e).__name__
                 },
                 exc_info=True

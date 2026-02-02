@@ -9,7 +9,7 @@ This example shows how to use the SearchPipeline with three search types:
 from llms.text import OpenAITextModel
 from src.search.config import SearchPipelineConfig, SearchType
 from src.search.pipeline import SearchPipeline
-from rag.processing.embeddings.openai_embedder import OpenAIEmbedder
+from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 
 
 def example_simple_search():

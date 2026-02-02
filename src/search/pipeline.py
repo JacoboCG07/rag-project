@@ -42,8 +42,9 @@ class SearchPipeline:
             extra={
                 "search_type": config.search_type.value,
                 "milvus_db": config.milvus.dbname,
-                "collection_documents": config.collection_name_documents,
-                "collection_summaries": config.collection_name_summaries,
+                "collection_name": config.collection_name,
+                "partition_documents": config.PARTITION_DOCUMENTS,
+                "partition_summaries": config.PARTITION_SUMMARIES,
                 "search_limit": config.search_limit
             }
         )

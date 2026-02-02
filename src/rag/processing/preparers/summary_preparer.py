@@ -11,7 +11,7 @@ from src.utils import get_logger
 class SummaryPreparer:
     """
     Prepares document summaries for insertion into Milvus.
-    Formats data according to the summary schema.
+    Formats data according to the document schema.
     """
 
     @staticmethod

@@ -211,7 +211,7 @@ class CollectionManager:
             self.logger.info(
                 "Index created successfully",
                 extra={
-                    "collection_name": collection_name,
+                    "collection_name": collection.name,
                     "name_index": name_index,
                     "field_name": field_name
                 }

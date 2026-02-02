@@ -31,17 +31,17 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
                 "Please configure it in SearchPipelineConfig."
             )
         
-        # Initialize MilvusSearcher for document search
+        # Initialize MilvusSearcher for document search (misma colección, partición 'documents')
         self.searcher = MilvusSearcher(
             db_name=config.milvus.dbname,
-            collection_name=config.collection_name_documents,
+            collection_name=config.collection_name,
             alias=config.milvus.alias
         )
         
-        # Initialize DocumentSelector
+        # Initialize DocumentSelector (misma colección, partición 'summaries')
         self.document_selector = DocumentSelector(
             dbname=config.milvus.dbname,
-            collection_name=config.collection_name_summaries,
+            collection_name=config.collection_name,
             text_model=config.text_model,
             uri=config.milvus.uri,
             token=config.milvus.token,
@@ -52,8 +52,9 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
         self.logger.info(
             "DocumentSelectorSearchStrategy initialized",
             extra={
-                "collection_documents": config.collection_name_documents,
-                "collection_summaries": config.collection_name_summaries,
+                "collection_name": config.collection_name,
+                "partition_documents": config.PARTITION_DOCUMENTS,
+                "partition_summaries": config.PARTITION_SUMMARIES,
                 "search_limit": config.search_limit
             }
         )
@@ -113,33 +114,40 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
                 }
             )
             
-            # Step 2: Search in selected documents using partitions
+            # Step 2: Search in selected documents using the 'documents' partition
             self.logger.info("Step 2: Searching in selected documents")
             
             # Connect to Milvus
             self.searcher.connect()
             
-            # Search in each selected document partition
+            # Search in the 'documents' partition, filtering by selected file_ids
             all_results = []
-            for file_id in selected_file_ids:
-                try:
-                    # Search in this document's partition
-                    partition_results = self.searcher.search_by_partition(
-                        query_embedding=query_embedding,
-                        partition_name=file_id,
-                        limit=self.config.search_limit
-                    )
-                    all_results.extend(partition_results)
-                    self.logger.debug(
-                        f"Found {len(partition_results)} results in partition {file_id}"
-                    )
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error searching in partition {file_id}: {str(e)}",
-                        extra={"file_id": file_id, "error_type": type(e).__name__}
-                    )
-                    # Continue with other partitions
-                    continue
+            
+            # Build filter expression for selected file_ids
+            if len(selected_file_ids) == 1:
+                filter_expr = f'file_id == "{selected_file_ids[0]}"'
+            else:
+                # Build: file_id in ["id1", "id2", ...]
+                file_ids_str = ", ".join([f'"{fid}"' for fid in selected_file_ids])
+                filter_expr = f'file_id in [{file_ids_str}]'
+            
+            try:
+                # Search in the 'documents' partition with file_id filter
+                partition_results = self.searcher.search(
+                    query_embedding=query_embedding,
+                    limit=self.config.search_limit * len(selected_file_ids),  # Get more results to cover all documents
+                    partition_names=[self.config.PARTITION_DOCUMENTS],
+                    filter_expr=filter_expr
+                )
+                all_results.extend(partition_results)
+                self.logger.debug(
+                    f"Found {len(partition_results)} results for {len(selected_file_ids)} selected documents"
+                )
+            except Exception as e:
+                self.logger.warning(
+                    f"Error searching in documents partition: {str(e)}",
+                    extra={"error_type": type(e).__name__}
+                )
             
             # Sort by score (descending) and limit results
             all_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)

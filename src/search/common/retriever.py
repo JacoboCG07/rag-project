@@ -94,11 +94,12 @@ class SummaryRetriever:
                 "text"
             ]
             
-            # Query all documents
+            # Query all documents from the 'summaries' partition
             # Use high limit to get all documents
             results = self.collection.query(
                 expr="id >= 0",  # Condition that includes all records
                 output_fields=output_fields,
+                partition_names=["summaries"],  # Buscar solo en la partición de resúmenes
                 limit=10000  # High limit to get all documents
             )
             
@@ -174,10 +175,11 @@ class SummaryRetriever:
             
             self.logger.debug(f"Querying Milvus with filter: {filter_expr}")
             
-            # Query with filter
+            # Query with filter from the 'summaries' partition
             results = self.collection.query(
                 expr=filter_expr,
                 output_fields=output_fields,
+                partition_names=["summaries"],  # Buscar solo en la partición de resúmenes
                 limit=10000  # High limit to get all matching documents
             )
             

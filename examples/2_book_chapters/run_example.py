@@ -26,7 +26,7 @@ sys.path.insert(0, str(root_dir))
 from llms.text import OpenAITextModel
 from src.search.config import SearchPipelineConfig, SearchType
 from src.search.pipeline import SearchPipeline
-from rag.processing.embeddings.openai_embedder import OpenAIEmbedder
+from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -156,4 +156,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
