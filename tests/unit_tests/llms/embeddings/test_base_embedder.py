@@ -9,16 +9,16 @@ from unittest.mock import Mock, patch
 
 # Add src to path
 # Calculate project root: go up from test file to project root
-# test_base_embedder.py -> embeddings/ -> processing/ -> rag/ -> unit_tests/ -> tests/ -> project_root
+# test_base_embedder.py -> embeddings/ -> llms/ -> unit_tests/ -> tests/ -> project_root
 _current_file = Path(__file__).resolve()
-project_root = _current_file.parent.parent.parent.parent.parent.parent
+project_root = _current_file.parent.parent.parent.parent.parent
 src_path = project_root / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
 else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
-from rag.processing.embeddings.base_embedder import BaseEmbedder, RateLimitError
+from src.llms.embeddings.base_embedder import BaseEmbedder, RateLimitError
 
 
 class MockEmbedder(BaseEmbedder):
@@ -34,7 +34,7 @@ class MockEmbedder(BaseEmbedder):
         self.always_raise_error = always_raise_error
         self.error_message = error_message or "Connection error"
     
-    def generate_embedding(self, *, text: str):
+    def generate_embedding(self, text: str):
         """Mock implementation of generate_embedding"""
         self.call_count += 1
         
@@ -53,9 +53,28 @@ class MockEmbedder(BaseEmbedder):
         
         return ([0.1, 0.2, 0.3], 10)
     
-    def get_dimensions(self) -> int:
-        """Mock implementation of get_dimensions"""
-        return self.dimensions
+    def _get_serializable_config(self) -> dict:
+        """Mock implementation of _get_serializable_config"""
+        return {
+            "dimensions": self.dimensions,
+            "should_raise_rate_limit": self.should_raise_rate_limit,
+            "always_raise_rate_limit": self.always_raise_rate_limit,
+            "always_raise_error": self.always_raise_error,
+            "error_message": self.error_message
+        }
+    
+    @classmethod
+    def _from_config(cls, config: dict) -> 'MockEmbedder':
+        """Mock implementation of _from_config"""
+        instance = cls.__new__(cls)
+        instance.dimensions = config["dimensions"]
+        instance.should_raise_rate_limit = config["should_raise_rate_limit"]
+        instance.always_raise_rate_limit = config["always_raise_rate_limit"]
+        instance.always_raise_error = config["always_raise_error"]
+        instance.error_message = config["error_message"]
+        instance.call_count = 0
+        instance.delay = 0
+        return instance
 
 
 class TestBaseEmbedder:
@@ -176,7 +195,9 @@ class TestBaseEmbedder:
         
         result = BaseEmbedder._process_batch_with_retry(
             batch=batch,
-            embedder=embedder,
+            embedder_class_name="MockEmbedder",
+            embedder_module=__name__,
+            embedder_config=embedder._get_serializable_config(),
             max_retries=3,
             retry_delay=0.1
         )
@@ -194,7 +215,9 @@ class TestBaseEmbedder:
         with patch('time.sleep'):  # Mock sleep to speed up test
             result = BaseEmbedder._process_batch_with_retry(
                 batch=batch,
-                embedder=embedder,
+                embedder_class_name="MockEmbedder",
+                embedder_module=__name__,
+                embedder_config=embedder._get_serializable_config(),
                 max_retries=3,
                 retry_delay=0.1
             )
@@ -216,20 +239,20 @@ class TestBaseEmbedder:
             assert r is not None
             assert r == ([0.1, 0.2, 0.3], 10)
     
-    def test_get_dimensions_returns_int(self):
-        """Test that get_dimensions returns an integer"""
+    def test_dimensions_returns_int(self):
+        """Test that dimensions is an integer"""
         embedder = MockEmbedder(dimensions=256)
         
-        dimensions = embedder.get_dimensions()
+        dimensions = embedder.dimensions
         
         assert isinstance(dimensions, int)
         assert dimensions == 256
     
-    def test_get_dimensions_custom_dimensions(self):
-        """Test get_dimensions with custom dimensions"""
+    def test_dimensions_custom_dimensions(self):
+        """Test dimensions with custom dimensions"""
         embedder = MockEmbedder(dimensions=512)
         
-        dimensions = embedder.get_dimensions()
+        dimensions = embedder.dimensions
         
         assert dimensions == 512
 
