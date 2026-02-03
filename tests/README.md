@@ -29,10 +29,10 @@ Run all tests in a specific folder:
 pytest tests/unit_tests/
 
 # All tests in extractors
-pytest tests/unit_tests/rag/extractors/
+pytest tests/unit_tests/ingestion/extractors/
 
 # All tests in txt extractor folder
-pytest tests/unit_tests/rag/extractors/txt/
+pytest tests/unit_tests/ingestion/extractors/txt/
 ```
 
 ### Run Tests from a Specific File
@@ -40,7 +40,7 @@ pytest tests/unit_tests/rag/extractors/txt/
 Run all tests in a specific test file:
 
 ```bash
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py
 ```
 
 ### Run a Specific Test
@@ -49,10 +49,10 @@ Run a single specific test:
 
 ```bash
 # Run a specific test method
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract
 
 # Run a specific test class
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor
 ```
 
 ## Pytest Options
@@ -67,8 +67,8 @@ pytest tests/ -v
 
 **Output example:**
 ```
-tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_init PASSED
-tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_get_metadata PASSED
+tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_init PASSED
+tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_get_metadata PASSED
 ```
 
 ### `-s` or `--capture=no`
@@ -154,7 +154,7 @@ pytest tests/ -v -x
 ### Run specific test with verbose and output
 
 ```bash
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract -v -s
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract -v -s
 ```
 
 ## Examples
@@ -162,7 +162,7 @@ pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtract
 ### Example 1: Run all TXT extractor tests with verbose output
 
 ```bash
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py -v
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py -v
 ```
 
 ### Example 2: Run all tests and stop on first failure
@@ -180,7 +180,7 @@ pytest tests/ -k "test_extract" -v
 ### Example 4: Run a specific test with full output
 
 ```bash
-pytest tests/unit_tests/rag/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract -v -s
+pytest tests/unit_tests/ingestion/extractors/txt/test_txt_extractor.py::TestTXTExtractor::test_extract -v -s
 ```
 
 ## Directory Structure
@@ -191,7 +191,7 @@ tests/
 │   ├── sample.txt
 │   └── empty.txt
 └── unit_tests/           # Unit tests
-    └── rag/
+    └── ingestion/
         └── extractors/
             └── txt/
                 └── test_txt_extractor.py
