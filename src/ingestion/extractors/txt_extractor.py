@@ -2,12 +2,11 @@
 Text file extractor
 """
 from typing import List
-from ..base import (
-    BaseDocumentExtractor,
-    BaseFileMetadata,
-    ExtractionResult
-)
+
 from src.utils import get_logger
+
+from .base_extractor import BaseDocumentExtractor
+from ..types import BaseFileMetadata, ExtractionResult
 
 
 class TXTExtractor(BaseDocumentExtractor[BaseFileMetadata]):
@@ -80,7 +79,7 @@ class TXTExtractor(BaseDocumentExtractor[BaseFileMetadata]):
                 },
                 exc_info=True
             )
-            raise Exception(f"Error extracting content from text file {self.file_name}: {str(e)}")
+            raise Exception(f"Error extracting content from text file {self.file_name}: {str(e)}") from e
     
     def _read_text_file(self) -> str:
         """
@@ -127,12 +126,13 @@ class TXTExtractor(BaseDocumentExtractor[BaseFileMetadata]):
                     extra={"file_path": str(self.file_path)},
                     exc_info=True
                 )
-                raise Exception(f"Error reading text file with UTF-8 encoding: {str(e)}")
+                raise Exception(f"Error reading text file with UTF-8 encoding: {str(e)}") from e
         except Exception as e:
             self.logger.error(
                 f"Error reading text file: {str(e)}",
                 extra={"file_path": str(self.file_path)},
                 exc_info=True
             )
-            raise Exception(f"Error reading text file: {str(e)}")
+            raise Exception(f"Error reading text file: {str(e)}") from e
+
 

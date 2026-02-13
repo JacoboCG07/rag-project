@@ -3,9 +3,8 @@ RAG schema strategy for Milvus
 Schema optimized for Retrieval Augmented Generation
 """
 
-from pymilvus import FieldSchema, CollectionSchema, DataType
 from ..base import SchemaProvider
-
+from pymilvus import FieldSchema, CollectionSchema, DataType
 
 class DocumentSchemaProvider(SchemaProvider):
     """
@@ -33,16 +32,16 @@ class DocumentSchemaProvider(SchemaProvider):
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
             FieldSchema(name="file_id", dtype=DataType.VARCHAR, max_length=100, is_index=True),
+            FieldSchema(name="file_type", dtype=DataType.VARCHAR, max_length=30, is_index=True),
             FieldSchema(name="file_name", dtype=DataType.VARCHAR, max_length=1024),
             FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=20_000),
             FieldSchema(name="text_embedding", dtype=DataType.FLOAT_VECTOR, dim=self.embedding_dim),
-            FieldSchema(name="type_file", dtype=DataType.VARCHAR, max_length=30, is_index=True),
             FieldSchema(name="pages", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="chapters", dtype=DataType.VARCHAR, max_length=500),
             FieldSchema(name="image_number", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="image_number_in_page", dtype=DataType.VARCHAR, max_length=100),
-            FieldSchema(name="total_images", dtype=DataType.VARCHAR, max_length=100),
+            FieldSchema(name="full_images", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="date", dtype=DataType.VARCHAR, max_length=100),
         ]
-        return CollectionSchema(fields, enable_dynamic=True)
 
+        return CollectionSchema(fields, enable_dynamic=True)

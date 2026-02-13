@@ -3,10 +3,12 @@ Factory for creating extractors based on file type
 """
 from pathlib import Path
 from typing import List
-from ..base import BaseDocumentExtractor
-from ..pdf import PDFExtractor
-from ..txt import TXTExtractor
+
 from src.utils import get_logger
+
+from .base_extractor import BaseDocumentExtractor
+from .pdf_extractor import PDFExtractor
+from .txt_extractor import TXTExtractor
 
 
 class DocumentExtractorFactory:
@@ -53,18 +55,19 @@ class DocumentExtractorFactory:
         if file_extension == '.pdf':
             logger.debug("Creating PDFExtractor")
             return PDFExtractor(file_path)
-        elif file_extension == '.txt':
+        if file_extension == '.txt':
             logger.debug("Creating TXTExtractor")
             return TXTExtractor(file_path)
-        else:
-            error_msg = f"Unsupported file type: {file_extension}"
-            logger.error(
-                error_msg,
-                extra={
-                    "file_path": file_path,
-                    "file_extension": file_extension,
-                    "supported_extensions": DocumentExtractorFactory._SUPPORTED_EXTENSIONS
-                }
-            )
-            raise ValueError(error_msg)
+        
+        error_msg = f"Unsupported file type: {file_extension}"
+        logger.error(
+            error_msg,
+            extra={
+                "file_path": file_path,
+                "file_extension": file_extension,
+                "supported_extensions": DocumentExtractorFactory._SUPPORTED_EXTENSIONS
+            }
+        )
+        raise ValueError(error_msg)
+
 

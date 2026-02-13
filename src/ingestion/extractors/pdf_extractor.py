@@ -4,13 +4,15 @@ PDF document extractor
 from typing import List
 import base64
 import fitz  # PyMuPDF
-from ..base import (
-    BaseDocumentExtractor,
+
+from src.utils import get_logger
+
+from .base_extractor import BaseDocumentExtractor
+from ..types import (
     ImageData,
     PDFFileMetadata,
-    ExtractionResult
+    ExtractionResult,
 )
-from src.utils import get_logger
 
 
 class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
@@ -50,7 +52,8 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 file_name=base_metadata.file_name,
                 file_type=base_metadata.file_type,
                 total_pages=total_pages,
-                total_images=total_images
+                total_images=total_images,
+                chapters=False,  # False by default until we analyze the text to determine if it has chapters
             )
             
             self.logger.debug(
@@ -58,7 +61,8 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 extra={
                     "file_name": metadata.file_name,
                     "total_pages": total_pages,
-                    "total_images": total_images
+                    "total_images": total_images,
+                    "chapters": False
                 }
             )
             
@@ -70,7 +74,7 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 extra={"file_path": str(self.file_path)},
                 exc_info=True
             )
-            raise Exception(f"Error getting PDF metadata: {str(e)}")
+            raise Exception(f"Error getting PDF metadata: {str(e)}") from e
     
     def _count_images(self, doc) -> int:
         """
@@ -150,7 +154,7 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 },
                 exc_info=True
             )
-            raise Exception(f"Error extracting content from PDF {self.file_name}: {str(e)}")
+            raise Exception(f"Error extracting content from PDF {self.file_name}: {str(e)}") from e
     
     def _extract_text_from_pdf(self) -> List[str]:
         """
@@ -189,7 +193,7 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 extra={"file_path": str(self.file_path)},
                 exc_info=True
             )
-            raise Exception(f"Error extracting text from PDF: {str(e)}")
+            raise Exception(f"Error extracting text from PDF: {str(e)}") from e
     
     def _extract_images_from_pdf(self) -> List[ImageData]:
         """
@@ -227,8 +231,8 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                     images.append(ImageData(
                         page=page_num + 1,                    # Pages start at 1
                         image_number_in_page=image_index + 1,  # Image number in page (starting at 1)
-                        image_number=total_image_counter, # Total image number in document (starting at 1)
-                        image_base64=image_base64,            # Base64 encoded image (for API usage)
+                        image_number=total_image_counter,      # Total image number in document (starting at 1)
+                        image_base64=image_base64,             # Base64 encoded image (for API usage)
                         image_format=image_format
                     ))
             
@@ -251,5 +255,6 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
                 extra={"file_path": str(self.file_path)},
                 exc_info=True
             )
-            raise Exception(f"Error extracting images from PDF: {str(e)}")
+            raise Exception(f"Error extracting images from PDF: {str(e)}") from e
+
 

@@ -19,7 +19,7 @@ if src_path.exists():
 else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
-from ingestion.extractors.pdf import PDFExtractor
+from ingestion.extractors.pdf_extractor import PDFExtractor
 
 
 @pytest.fixture

@@ -18,7 +18,7 @@ if src_path.exists():
 else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
-from ingestion.extractors.txt import TXTExtractor
+from ingestion.extractors.txt_extractor import TXTExtractor
 
 @pytest.fixture
 def fixtures_dir():

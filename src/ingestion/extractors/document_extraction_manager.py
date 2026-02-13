@@ -2,12 +2,14 @@
 Manages extraction of information from one or multiple documents using extractors
 """
 from pathlib import Path
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 import inspect
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from .factory import DocumentExtractorFactory
-from .base.types import ExtractionResult, BaseFileMetadata
+
 from src.utils import get_logger
+
+from ..types import ExtractionResult, BaseFileMetadata
+from .factory import DocumentExtractorFactory
 
 
 class DocumentExtractionManager:
@@ -202,9 +204,9 @@ class DocumentExtractionManager:
         # Pydantic models can be serialized as dicts
         return result.model_dump() if hasattr(result, 'model_dump') else result.dict()
     
-    def extract_file(self, file_path: Path, extract_images: bool = False) -> ExtractionResult[BaseFileMetadata]:
+    def extract_file_data(self, file_path: Path, extract_images: bool = False) -> ExtractionResult[BaseFileMetadata]:
         """
-        Extracts information from a single document
+        Extracts data and information from a single document
         
         Args:
             file_path: Path to the document to extract

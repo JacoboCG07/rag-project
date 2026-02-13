@@ -19,9 +19,9 @@ else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
 from ingestion.extractors.factory import DocumentExtractorFactory
-from ingestion.extractors.pdf import PDFExtractor
-from ingestion.extractors.txt import TXTExtractor
-from ingestion.extractors.base import BaseDocumentExtractor  # pyright: ignore[reportMissingImports]
+from ingestion.extractors.pdf_extractor import PDFExtractor
+from ingestion.extractors.txt_extractor import TXTExtractor
+from ingestion.extractors.base_extractor import BaseDocumentExtractor  # pyright: ignore[reportMissingImports]
 
 class TestDocumentExtractorFactory:
     """Test class for DocumentExtractorFactory"""

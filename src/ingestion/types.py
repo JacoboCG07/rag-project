@@ -47,6 +47,7 @@ class PDFFileMetadata(BaseFileMetadata):
     """
     total_pages: int = Field(..., ge=1, description="Total number of pages in the PDF")
     total_images: int = Field(..., ge=0, description="Total number of images in the PDF")
+    chapters: bool = Field(..., description="True if the PDF has chapters, False otherwise")
 
 
 # Type variable for metadata types
@@ -62,6 +63,7 @@ class ExtractionResult(BaseModel, Generic[MetadataType]):
         images: Optional list of extracted images (None if no images or extract_images=False)
         metadata: File metadata (specific to document type)
     """
+    
     content: List[str] = Field(..., description="List of text content, typically one string per page")
     images: Optional[List[ImageData]] = Field(default=None, description="Optional list of extracted images")
     metadata: MetadataType = Field(..., description="File metadata (specific to document type)")

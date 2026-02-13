@@ -276,4 +276,3 @@ class DocumentPreparer:
             prepared_data.append(data)
 
         return prepared_data
-

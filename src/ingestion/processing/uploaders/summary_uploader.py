@@ -4,11 +4,13 @@ Handles generation and uploading of document summaries
 """
 
 from typing import Dict, List, Any, Optional, Tuple, Callable
-from ...extractors.base.types import ExtractionResult
-from ..milvus.milvus_client import MilvusClient
+
 from src.utils import get_logger
 
-class SummaryProcessor:
+from ...types import ExtractionResult
+from ..milvus.milvus_client import MilvusClient
+
+class SummaryUploader:
     """
     Handles generation and uploading of document summaries to Milvus.
     Single responsibility: summary generation and insertion.
@@ -36,7 +38,7 @@ class SummaryProcessor:
         
         self.logger.info("Initializing SummaryProcessor")
 
-    def process_and_upload_summary(
+    def upload_summary(
         self,
         *,
         document_data: ExtractionResult,
@@ -83,7 +85,7 @@ class SummaryProcessor:
             # Get file_name and file_type from metadata
             file_name = metadata_obj.file_name
             file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
-            source_id = file_id  # Use file_id as source_id
+            
             num_images = len(images) if images else 0
 
             self.logger.debug(
@@ -110,12 +112,12 @@ class SummaryProcessor:
             self._process_and_insert_summary(
                 summary=summary,
                 file_id=file_id,
-                file_name=file_name,
-                source_id=source_id,
                 file_type=file_type,
-                partition_name=partition_name,
+                file_name=file_name,
                 num_pages=len(content),
-                num_images=num_images
+                chapters=chapters,
+                num_images=num_images,
+                partition_name=partition_name,
             )
 
             self.logger.info(
@@ -202,12 +204,12 @@ class SummaryProcessor:
         *,
         summary: str,
         file_id: str,
-        file_name: str,
-        source_id: str,
         file_type: str,
-        partition_name: str,
+        file_name: str,
         num_pages: int,
-        num_images: int
+        chapters: bool,
+        num_images: int,
+        partition_name: str,
     ) -> None:
         """
         Processes summary and inserts it into Milvus.
@@ -215,12 +217,11 @@ class SummaryProcessor:
         Args:
             summary: Document summary text.
             file_id: File ID.
-            file_name: File name.
-            source_id: Source ID.
             file_type: File type.
-            partition_name: Partition name.
+            file_name: File name.
             num_pages: Number of pages in the document.
             num_images: Number of images in the document.
+            partition_name: Partition name.
         """
         if not summary or not isinstance(summary, str):
             return
@@ -240,12 +241,11 @@ class SummaryProcessor:
         # Prepare metadata for summary
         metadata_summary = self._prepare_metadata(
             file_id=file_id,
-            file_name=file_name,
-            source_id=source_id,
             file_type=f"summary_{file_type}",
+            file_name=f"summary_{file_name}",
             num_pages=num_pages,
+            chapters=chapters,
             num_images=num_images,
-            pages=list(range(1, num_pages + 1)) if num_pages > 0 else []
         )
 
         # Insert summary into summaries collection
@@ -260,12 +260,11 @@ class SummaryProcessor:
     def _prepare_metadata(
         *,
         file_id: str,
-        file_name: str,
-        source_id: str,
         file_type: str,
+        file_name: str,
         num_pages: int,
+        chapters: bool,
         num_images: int,
-        pages: List[int]
     ) -> Dict[str, Any]:
         """
         Prepares metadata for insertion into Milvus.
@@ -284,9 +283,9 @@ class SummaryProcessor:
         """
         return {
             "file_id": file_id,
+            "file_type": file_type,
             "file_name": file_name,
-            "type_file": file_type,
-            "total_pages": str(num_pages),
-            "total_chapters": "",
-            "total_num_image": str(num_images),
+            "full_pages": str(num_pages),
+            "chapters": str(chapters),
+            "full_images": str(num_images),
         }

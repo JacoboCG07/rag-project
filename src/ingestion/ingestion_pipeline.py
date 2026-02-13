@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 import hashlib
 
-from .extractors.base.types import ExtractionResult, BaseFileMetadata
+from .types import ExtractionResult, BaseFileMetadata
 from .extractors import DocumentExtractionManager
-from .processing.processor import DocumentProcessor
+from .processing.document_processor import DocumentProcessor
 from .config import IngestionPipelineConfig
 from src.utils import get_logger
 
@@ -62,7 +62,10 @@ class IngestionPipeline:
                 uri=config.milvus.uri,
                 token=config.milvus.token,
                 host=config.milvus.host,
-                port=config.milvus.port
+                port=config.milvus.port,
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+                detect_chapters=config.detect_chapters
             )
             self.logger.info("Ingestion Pipeline initialized successfully")
         except Exception as e:
@@ -86,8 +89,8 @@ class IngestionPipeline:
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Processes a single file and inserts it into Milvus.
-        Los documentos se insertan en la partición 'documents' y los resúmenes en 'summaries'
-        de la colección especificada en la configuración.
+        Documents are inserted into the 'documents' partition and summaries into 'summaries'
+        of the collection specified in the configuration.
 
         Args:
             file_path: Path to the file to process.
@@ -99,63 +102,23 @@ class IngestionPipeline:
             result_info contains: file_id, file_name, file_path.
         """
         # Bind job_id al logger para que aparezca en todos los logs
-        if job_id:
-            self.logger = self.logger.bind(job_id=job_id)
+        if job_id: self.logger = self.logger.bind(job_id=job_id)
         
         file_path_obj = Path(file_path)
         file_id = self._generate_file_id(file_path)
-        
-        self.logger.info(
-            "Starting file processing",
-            extra={
-                "file_path": str(file_path_obj),
-                "file_id": file_id,
-                "collection_name": self.config.collection_name,
-                "extract_process_images": extract_process_images
-            }
-        )
+        self._log_file_processing_start(file_path_obj, file_id, extract_process_images)
         
         try:
-            # Initialize DocumentExtractionManager with parent folder
+            # Initialize and extract content from DocumentExtractionManager with parent folder
             extraction_manager = DocumentExtractionManager(folder_path=str(file_path_obj.parent))
-            
-            # Extract the document data
-            self.logger.debug(
-                "Extracting file content",
-                extra={
-                    "file_path": str(file_path_obj),
-                    "file_id": file_id,
-                    "extract_images": extract_process_images
-                }
-            )
-            document_data: ExtractionResult[BaseFileMetadata] = extraction_manager.extract_file(
+            document_data: ExtractionResult[BaseFileMetadata] = extraction_manager.extract_file_data(
                 file_path=file_path_obj,
                 extract_images=extract_process_images
             )
-
-            file_name = document_data.metadata.file_name
-            content_chunks = len(document_data.content) if document_data.content else 0
-            images_count = len(document_data.images) if document_data.images else 0
-            
-            self.logger.info(
-                "File content extracted",
-                extra={
-                    "file_id": file_id,
-                    "file_name": file_name,
-                    "content_chunks": content_chunks,
-                    "images_count": images_count
-                }
-            )
+            file_name = self._log_extracted_content(document_data, file_id)
 
             # Process and insert document in milvus
-            self.logger.debug(
-                "Processing and inserting document into Milvus",
-                extra={
-                    "file_id": file_id,
-                    "file_name": file_name,
-                    "collection_name": self.config.collection_name
-                }
-            )
+            self._log_milvus_processing_start_debug(file_id, file_name)
             success, message = self.document_processor.process_and_insert(
                 file_id=file_id,
                 document_data=document_data,
@@ -169,26 +132,8 @@ class IngestionPipeline:
                 "file_path": str(file_path_obj)
             }
             
-            if success:
-                self.logger.info(
-                    "File processed successfully",
-                    extra={
-                        "file_id": file_id,
-                        "file_name": file_name,
-                        "collection_name": self.config.collection_name,
-                        "message": message
-                    }
-                )
-            else:
-                self.logger.error(
-                    "Error processing file",
-                    extra={
-                        "file_id": file_id,
-                        "file_name": file_name,
-                        "collection_name": self.config.collection_name,
-                        "error_message": message
-                    }
-                )
+            if success: self._log_file_processed_successfully(file_id, file_name, message)
+            else: self._log_file_processing_error(file_id, file_name, message)
             
             return success, message, result_info
             
@@ -227,6 +172,129 @@ class IngestionPipeline:
         normalized_path = str(Path(file_path).resolve())
         file_hash = hashlib.md5(normalized_path.encode()).hexdigest()
         return file_hash
+
+    def _log_file_processing_start(
+        self,
+        file_path_obj: Path,
+        file_id: str,
+        extract_process_images: Optional[bool]
+    ) -> None:
+        """
+        Logs information when starting file processing.
+
+        Args:
+            file_path_obj: Path object of the file being processed.
+            file_id: File identifier.
+            extract_process_images: Whether to extract images from PDFs.
+        """
+        self.logger.info(
+            "Starting file processing",
+            extra={
+                "file_path": str(file_path_obj),
+                "file_id": file_id,
+                "collection_name": self.config.collection_name,
+                "extract_process_images": extract_process_images
+            }
+        )
+
+    def _log_extracted_content(
+        self,
+        document_data: ExtractionResult[BaseFileMetadata],
+        file_id: str
+    ) -> str:
+        """
+        Logs information about extracted file content.
+
+        Args:
+            document_data: ExtractionResult containing the extracted document data.
+            file_id: File identifier.
+
+        Returns:
+            str: File name from document metadata.
+        """
+        file_name = document_data.metadata.file_name
+        content = len(document_data.content)
+        images_count = len(document_data.images) if document_data.images else 0
+        
+        self.logger.info(
+            "File content extracted",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "content": content,
+                "images_count": images_count
+            }
+        )
+        return file_name
+
+    def _log_milvus_processing_start_debug(
+        self,
+        file_id: str,
+        file_name: str
+    ) -> None:
+        """
+        Logs debug information before processing and inserting document into Milvus.
+
+        Args:
+            file_id: File identifier.
+            file_name: Name of the file being processed.
+        """
+        self.logger.debug(
+            "Processing and inserting document into Milvus",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "collection_name": self.config.collection_name
+            }
+        )
+
+    def _log_file_processed_successfully(
+        self,
+        file_id: str,
+        file_name: str,
+        message: str
+    ) -> None:
+        """
+        Logs information when a file is processed successfully.
+
+        Args:
+            file_id: File identifier.
+            file_name: Name of the file that was processed.
+            message: Success message from the processing operation.
+        """
+        self.logger.info(
+            "File processed successfully",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "collection_name": self.config.collection_name,
+                "message": message
+            }
+        )
+
+    def _log_file_processing_error(
+        self,
+        file_id: str,
+        file_name: str,
+        error_message: str
+    ) -> None:
+        """
+        Logs error information when file processing fails.
+
+        Args:
+            file_id: File identifier.
+            file_name: Name of the file that failed to process.
+            error_message: Error message from the processing operation.
+        """
+        self.logger.error(
+            "Error processing file",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "collection_name": self.config.collection_name,
+                "error_message": error_message
+            }
+        )
 
     def close(self) -> None:
         """Closes connections with Milvus."""

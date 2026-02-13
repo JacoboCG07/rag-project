@@ -21,7 +21,7 @@ else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
 from ingestion.extractors import DocumentExtractionManager
-from ingestion.extractors.base import ExtractionResult, BaseFileMetadata
+from ingestion.types import ExtractionResult, BaseFileMetadata
 
 
 @pytest.fixture
@@ -207,12 +207,12 @@ class TestDocumentExtractionManager:
         
         assert "Error getting files by extension" in str(exc_info.value)
     
-    def test_extract_file_pdf(self, temp_folder_only_pdf):
-        """Test extract_file with PDF file"""
+    def test_extract_file_data_pdf(self, temp_folder_only_pdf):
+        """Test extract_file_data with PDF file"""
         manager = DocumentExtractionManager(temp_folder_only_pdf)
         files = manager.get_files()
         
-        result = manager.extract_file(files[0], extract_images=False)
+        result = manager.extract_file_data(files[0], extract_images=False)
         
         assert isinstance(result, ExtractionResult)
         assert hasattr(result, 'content')
@@ -221,12 +221,12 @@ class TestDocumentExtractionManager:
         assert isinstance(result.content, list)
         assert len(result.content) > 0
     
-    def test_extract_file_txt(self, temp_folder_only_txt):
-        """Test extract_file with TXT file"""
+    def test_extract_file_data_txt(self, temp_folder_only_txt):
+        """Test extract_file_data with TXT file"""
         manager = DocumentExtractionManager(temp_folder_only_txt)
         files = manager.get_files()
         
-        result = manager.extract_file(files[0])
+        result = manager.extract_file_data(files[0])
         
         assert isinstance(result, ExtractionResult)
         assert hasattr(result, 'content')
@@ -234,12 +234,12 @@ class TestDocumentExtractionManager:
         assert isinstance(result.content, list)
         assert len(result.content) == 1
     
-    def test_extract_file_with_images(self, temp_folder_only_pdf):
-        """Test extract_file with extract_images=True"""
+    def test_extract_file_data_with_images(self, temp_folder_only_pdf):
+        """Test extract_file_data with extract_images=True"""
         manager = DocumentExtractionManager(temp_folder_only_pdf)
         files = manager.get_files()
         
-        result = manager.extract_file(files[0], extract_images=True)
+        result = manager.extract_file_data(files[0], extract_images=True)
         
         assert isinstance(result, ExtractionResult)
         assert hasattr(result, 'content')
@@ -247,13 +247,13 @@ class TestDocumentExtractionManager:
         assert hasattr(result, 'metadata')
         assert isinstance(result.images, list)
     
-    def test_extract_file_error_nonexistent_file(self, temp_empty_folder):
-        """Test extract_file raises error for non-existent file"""
+    def test_extract_file_data_error_nonexistent_file(self, temp_empty_folder):
+        """Test extract_file_data raises error for non-existent file"""
         manager = DocumentExtractionManager(temp_empty_folder)
         nonexistent_file = Path(temp_empty_folder) / "nonexistent.pdf"
         
         with pytest.raises(Exception) as exc_info:
-            manager.extract_file(nonexistent_file)
+            manager.extract_file_data(nonexistent_file)
         
         assert "Error extracting document" in str(exc_info.value)
     

@@ -1,18 +1,19 @@
 """
 Document uploader for Milvus
-Handles processing and uploading of full documents
+Orchestrates text and image processing and uploading
 """
 
-from ..milvus.milvus_client import MilvusClient
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from ...extractors.base.types import ExtractionResult, BaseFileMetadata, ImageData
-from .validators import validate_images_list
+from typing import Tuple, Callable, Any, Optional
 from src.utils import get_logger
+from ..milvus.milvus_client import MilvusClient
+from ...types import ExtractionResult
+from .components import TextUploader, ImageUploader
+
 
 class DocumentUploader:
     """
-    Handles processing and uploading of full documents to Milvus.
-    Single responsibility: document processing and insertion.
+    Orchestrates processing and uploading of full documents to Milvus.
+    Delegates text and image processing to specialized components.
     """
 
     def __init__(
@@ -20,26 +21,47 @@ class DocumentUploader:
         *,
         milvus_client: MilvusClient,
         generate_embeddings_func: Callable[[str], Any],
-        describe_image_func: Optional[Callable[[str], str]] = None
+        describe_image_func: Optional[Callable[[str], str]] = None,
+        chunk_size: int = 2000,
+        chunk_overlap: int = 0,
+        detect_chapters: bool = True,
     ):
         """
         Initializes the document uploader.
 
         Args:
             milvus_client: Milvus client for documents collection.
-            generate_embeddings_func: Function to generate embeddings (must receive text and return embedding).
-            describe_image_func: Function to describe image (must receive base64 image and return description string). Optional.
+            generate_embeddings_func: Function to generate embeddings.
+            describe_image_func: Function to describe image (optional).
+            chunk_size: Maximum size of each chunk in characters.
+            chunk_overlap: Number of characters to overlap between chunks.
+            detect_chapters: Whether to detect chapters in documents.
         """
-        self.milvus_client = milvus_client
-        self.generate_embeddings_func = generate_embeddings_func
-        self.describe_image_func = describe_image_func
         self.logger = get_logger(__name__)
-        
+
+        # Initialize specialized uploaders
+        self._text_uploader = TextUploader(
+            milvus_client=milvus_client,
+            generate_embeddings_func=generate_embeddings_func,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            detect_chapters=detect_chapters,
+        )
+
+        self._image_uploader = ImageUploader(
+            milvus_client=milvus_client,
+            generate_embeddings_func=generate_embeddings_func,
+            describe_image_func=describe_image_func,
+        )
+
         self.logger.info(
             "Initializing DocumentUploader",
             extra={
-                "has_describe_image_func": describe_image_func is not None
-            }
+                "has_describe_image_func": describe_image_func is not None,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "detect_chapters": detect_chapters,
+            },
         )
 
     def upload_document(
@@ -48,16 +70,17 @@ class DocumentUploader:
         document_data: ExtractionResult,
         file_id: str,
         process_images: bool = False,
-        partition_name: str
+        partition_name: str,
     ) -> Tuple[bool, str]:
         """
         Processes and uploads a document to Milvus.
 
         Args:
-            document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData), 
+            document_data: ExtractionResult with 'content' (list of texts), 
+                          'images' (optional list of ImageData), 
                           and 'metadata' (BaseFileMetadata or subclass).
             file_id: Unique file ID.
-            process_images: Whether to process and vectorize images (default False).
+            process_images: Whether to process and vectorize images.
             partition_name: Partition name for Milvus.
 
         Returns:
@@ -67,137 +90,87 @@ class DocumentUploader:
             ValueError: If document_data doesn't have the expected format.
         """
         try:
-            self.logger.info(
-                "Starting document upload",
-                extra={
-                    "file_id": file_id,
-                    "process_images": process_images,
-                    "partition_name": partition_name
-                }
+            self._log_starting_document_upload(
+                file_id=file_id,
+                process_images=process_images,
+                partition_name=partition_name,
             )
-            
-            # Validate data format
-            if not isinstance(document_data, ExtractionResult):
-                self.logger.error("document_data must be an ExtractionResult instance")
-                raise ValueError("document_data must be an ExtractionResult instance")
 
+            # Extract data from ExtractionResult
             content = document_data.content
             images = document_data.images or []
             metadata_obj = document_data.metadata
+            file_name = metadata_obj.file_name
+            file_type = (
+                metadata_obj.file_type
+                if hasattr(metadata_obj, "file_type")
+                else "document"
+            )
 
             if not content:
-                self.logger.error("document_data must contain 'content' with at least one element")
-                raise ValueError("document_data must contain 'content' with at least one element")
+                self.logger.error(
+                    "document_data must contain 'content' with at least one element"
+                )
+                raise ValueError(
+                    "document_data must contain 'content' with at least one element"
+                )
 
-            if not isinstance(content, list):
-                self.logger.error("'content' must be a list of texts")
-                raise ValueError("'content' must be a list of texts")
-
-            # Get file_name and file_type from metadata
-            file_name = metadata_obj.file_name
-            file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
-            source_id = file_id  # Use file_id as source_id
-
-            self.logger.debug(
-                "Processing document",
-                extra={
-                    "file_id": file_id,
-                    "file_name": file_name,
-                    "content_chunks": len(content),
-                    "images_count": len(images)
-                }
-            )
-
-            self.milvus_client.create_partition(partition_name=partition_name)
-
-            # Process texts
-            texts, embeddings = self._process_texts(content=content)
-            
-            self.logger.debug(
-                "Texts processed",
-                extra={
-                    "file_id": file_id,
-                    "texts_count": len(texts),
-                    "embeddings_count": len(embeddings)
-                }
-            )
-
-            # Prepare metadata
-            metadata = self._prepare_metadata(
+            self._log_processing_document(
                 file_id=file_id,
                 file_name=file_name,
-                source_id=source_id,
+                content_chunks=len(content),
+                images_count=len(images),
+            )
+
+            # Upload texts using TextUploader
+            chunks, chunks_count = self._text_uploader.process_and_upload(
+                content=content,
+                file_id=file_id,
+                file_name=file_name,
                 file_type=file_type,
-                num_pages=len(content),
-                num_images=len(images),
-                pages=list(range(1, len(content) + 1))
+                partition_name=partition_name,
             )
 
-            # Insert texts
-            self.milvus_client.insert_documents(
-                texts=texts,
-                embeddings=embeddings,
-                metadata=metadata,
-                partition_name=partition_name
-            )
-            
-            self.logger.info(
-                "Document texts inserted successfully",
-                extra={
-                    "file_id": file_id,
-                    "file_name": file_name,
-                    "texts_count": len(texts),
-                    "partition_name": partition_name
-                }
-            )
-
-            # Process images if requested and they exist
+            # Upload images if requested using ImageUploader
+            processed_images_count = 0
             if process_images and images:
-                self.logger.debug(
-                    "Processing images",
-                    extra={
-                        "file_id": file_id,
-                        "images_count": len(images)
-                    }
-                )
-                # Convert ImageData Pydantic models to dicts for validation
-                images_dict = [img.model_dump() if hasattr(img, 'model_dump') else img for img in images]
-                # Validate image structure
-                is_valid, error_msg = validate_images_list(images_dict)
-                if not is_valid:
-                    self.logger.error(
-                        f"Invalid image structure: {error_msg}",
-                        extra={"file_id": file_id, "images_count": len(images_dict)}
-                    )
-                    raise ValueError(f"Invalid image structure: {error_msg}")
-                
-                self._process_images(
-                    images=images_dict,  # Pass as dicts for processing
+                processed_images_count = self._image_uploader.process_and_upload(
+                    images=images,
                     file_id=file_id,
                     file_name=file_name,
-                    source_id=source_id,
                     file_type=file_type,
-                    partition_name=partition_name
+                    partition_name=partition_name,
                 )
 
+            # Build success message
             message = f"Document {file_name} uploaded successfully"
-            if process_images and images:
-                message += f" (with {len(images)} images processed)"
+            if process_images and images and processed_images_count > 0:
+                message += f" (with {processed_images_count} images processed)"
 
             self.logger.info(
                 "Document uploaded successfully",
                 extra={
                     "file_id": file_id,
                     "file_name": file_name,
-                    "texts_count": len(texts),
-                    "images_processed": len(images) if process_images and images else 0,
-                    "partition_name": partition_name
-                }
+                    "chunks_count": chunks_count,
+                    "images_processed": processed_images_count,
+                    "partition_name": partition_name,
+                },
             )
 
             return True, message
 
         except Exception as e:
+            # Get file_name for error message (in case it wasn't extracted yet)
+            try:
+                file_name = (
+                    document_data.metadata.file_name
+                    if hasattr(document_data, "metadata")
+                    else "unknown"
+                )
+            except:
+                file_name = "unknown"
+
             error_msg = f"Error uploading document {file_name}: {str(e)}"
             self.logger.error(
                 error_msg,
@@ -205,208 +178,59 @@ class DocumentUploader:
                     "file_id": file_id,
                     "file_name": file_name,
                     "partition_name": partition_name,
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 },
-                exc_info=True
+                exc_info=True,
             )
             return False, error_msg
 
-    def _process_texts(
+    def _log_starting_document_upload(
         self,
         *,
-        content: List[str]
-    ) -> Tuple[List[str], List[List[float]]]:
-        """
-        Processes texts and generates embeddings.
-
-        Args:
-            content: List of texts.
-
-        Returns:
-            Tuple[List[str], List[List[float]]]: (texts, embeddings).
-        """
-        texts = []
-        embeddings = []
-        skipped_count = 0
-
-        for text in content:
-            if not text or not isinstance(text, str):
-                skipped_count += 1
-                continue
-
-            # Clean text
-            cleaned_text = text.strip()
-            if not cleaned_text:
-                skipped_count += 1
-                continue
-
-            texts.append(cleaned_text)
-
-            # Generate embedding
-            embedding = self.generate_embeddings_func(cleaned_text)
-            if isinstance(embedding, tuple):
-                # If it returns (embedding, token_count), extract just the embedding
-                embedding, _ = embedding
-            embeddings.append(embedding)
-
-        if skipped_count > 0:
-            self.logger.debug(
-                "Skipped empty or invalid texts",
-                extra={"skipped_count": skipped_count, "processed_count": len(texts)}
-            )
-
-        return texts, embeddings
-
-    def _process_images(
-        self,
-        *,
-        images: List[Any],
         file_id: str,
-        file_name: str,
-        source_id: str,
-        file_type: str,
-        partition_name: str
+        process_images: bool,
+        partition_name: str,
     ) -> None:
         """
-        Processes images and inserts them into Milvus.
+        Logs the start of a document upload process.
 
         Args:
-            images: List of images (can be paths, base64, etc.).
-            file_id: File ID.
-            file_name: File name.
-            source_id: Source ID.
-            file_type: File type.
-            partition_name: Partition name.
+            file_id: Unique identifier of the file.
+            process_images: Whether images will be processed.
+            partition_name: Target partition in Milvus.
         """
-        if not images:
-            self.logger.debug("No images to process")
-            return
-
-        image_texts = []
-        image_embeddings = []
-        skipped_count = 0
-
-        for image in images:
-            # Images are validated before calling this method, so we know they have the expected structure
-            page = image.get('page', 0)
-            image_num_in_page = image.get('image_number_in_page', 0)
-            image_num = image.get('image_number', 0)
-            image_base64 = image.get('image_base64', '')
-            
-            # Only process image if we have describe_image_func and image_base64
-            if not self.describe_image_func or not image_base64:
-                # Skip this image if we can't describe it
-                skipped_count += 1
-                self.logger.debug(
-                    "Skipping image (no describe function or base64)",
-                    extra={
-                        "file_id": file_id,
-                        "page": page,
-                        "image_number": image_num
-                    }
-                )
-                continue
-            
-            # Try to describe the image using LLM
-            try:
-                image_description = self.describe_image_func(image=image_base64)
-            except Exception as e:
-                # If description fails, skip this image and continue with the next one
-                skipped_count += 1
-                self.logger.warning(
-                    f"Failed to describe image: {str(e)}",
-                    extra={
-                        "file_id": file_id,
-                        "page": page,
-                        "image_number": image_num,
-                        "error_type": type(e).__name__
-                    }
-                )
-                continue
-
-            image_texts.append(image_description)
-
-            # Generate embedding from image description
-            embedding = self.generate_embeddings_func(image_description)
-            if isinstance(embedding, tuple):
-                # If it returns (embedding, token_count), extract just the embedding
-                embedding, _ = embedding
-            image_embeddings.append(embedding)
-
-        # Prepare metadata for images
-        metadata = self._prepare_metadata(
-            file_id=file_id,
-            file_name=file_name,
-            source_id=source_id,
-            file_type=f"image_{file_type}",
-            num_pages=len(images),
-            num_images=len(images),
-            pages=list(range(1, len(images) + 1))
+        self.logger.info(
+            "Starting document upload",
+            extra={
+                "file_id": file_id,
+                "process_images": process_images,
+                "partition_name": partition_name,
+            },
         )
 
-        if skipped_count > 0:
-            self.logger.debug(
-                "Some images were skipped",
-                extra={
-                    "file_id": file_id,
-                    "total_images": len(images),
-                    "processed_images": len(image_texts),
-                    "skipped_images": skipped_count
-                }
-            )
-
-        # Insert images
-        if image_texts:
-            self.milvus_client.insert_documents(
-                texts=image_texts,
-                embeddings=image_embeddings,
-                metadata=metadata,
-                partition_name=partition_name
-            )
-            
-            self.logger.info(
-                "Images inserted successfully",
-                extra={
-                    "file_id": file_id,
-                    "file_name": file_name,
-                    "images_count": len(image_texts),
-                    "partition_name": partition_name
-                }
-            )
-
-    @staticmethod
-    def _prepare_metadata(
+    def _log_processing_document(
+        self,
         *,
         file_id: str,
         file_name: str,
-        source_id: str,
-        file_type: str,
-        num_pages: int,
-        num_images: int,
-        pages: List[int]
-    ) -> Dict[str, Any]:
+        content_chunks: int,
+        images_count: int,
+    ) -> None:
         """
-        Prepares metadata for insertion into Milvus.
+        Logs information about the document being processed.
 
         Args:
-            file_id: File ID.
-            file_name: File name.
-            source_id: Source ID.
-            file_type: File type.
-            num_pages: Number of pages.
-            num_images: Number of images.
-            pages: List of page numbers.
-
-        Returns:
-            Dict: Prepared metadata.
+            file_id: Unique identifier of the file.
+            file_name: Name of the file.
+            content_chunks: Number of content chunks/pages.
+            images_count: Number of images associated with the document.
         """
-        return {
-            "file_id": file_id,
-            "file_name": file_name,
-            "type_file": file_type,
-            "pages": [str(p) for p in pages],
-            "chapters": "",
-            "image_number": "",
-            "image_number_in_page": "",
-        }
-
+        self.logger.debug(
+            "Processing document",
+            extra={
+                "file_id": file_id,
+                "file_name": file_name,
+                "content_chunks": content_chunks,
+                "images_count": images_count,
+            },
+        )

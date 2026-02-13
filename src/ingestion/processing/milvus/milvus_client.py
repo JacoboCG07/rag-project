@@ -165,6 +165,49 @@ class MilvusClient:
             }
         )
 
+    def insert_prepared_data(
+        self,
+        *,
+        prepared_data: List[Dict[str, Any]],
+        partition_name: Optional[str] = None
+    ) -> None:
+        """
+        Inserts already prepared data into Milvus.
+        Use this when data has been prepared by DocumentPreparer.
+
+        Args:
+            prepared_data: List of dictionaries with all fields ready for Milvus insertion.
+            partition_name: Partition name (optional).
+        """
+        self.logger.debug(
+            "Inserting prepared data",
+            extra={
+                "data_count": len(prepared_data),
+                "partition_name": partition_name,
+                "collection_name": self.collection_name
+            }
+        )
+
+        if not prepared_data:
+            self.logger.warning("No prepared data to insert")
+            return
+
+        collection = self.load_collection()
+        self._data_manager.insert_data(
+            collection=collection,
+            data=prepared_data,
+            partition_name=partition_name
+        )
+        
+        self.logger.info(
+            "Prepared data inserted successfully",
+            extra={
+                "documents_count": len(prepared_data),
+                "partition_name": partition_name,
+                "collection_name": self.collection_name
+            }
+        )
+
     def close(self) -> None:
         """Closes connection and releases resources."""
         self.logger.debug("Closing MilvusClient", extra={"collection_name": self.collection_name})

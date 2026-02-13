@@ -30,9 +30,8 @@ class SummaryPreparer:
             tokens: Token count (optional).
             metadata: Metadata dictionary with:
                 - file_id: str (required)
-                - file_name: str (required)
-                - source_id: str (optional, uses file_id if not provided)
-                - type_file: str (required, typically "summary_<file_type>")
+                - file_type: str (required, typically "summary_<origin_file_type>")
+                - file_name: str (required, typically "summary_<origin_file_name>")
                 - total_pages: int or str (optional, default "0")
                 - total_chapters: str (optional, default "")
                 - total_num_image: int or str (optional, default "0")
@@ -64,39 +63,34 @@ class SummaryPreparer:
         if 'file_id' not in metadata:
             logger.error("metadata must contain 'file_id'")
             raise ValueError("metadata must contain 'file_id'")
+        if 'file_type' not in metadata:
+            logger.error("metadata must contain 'file_type'")
+            raise ValueError("metadata must contain 'file_type'")
         if 'file_name' not in metadata:
             logger.error("metadata must contain 'file_name'")
             raise ValueError("metadata must contain 'file_name'")
-        if 'type_file' not in metadata:
-            logger.error("metadata must contain 'type_file'")
-            raise ValueError("metadata must contain 'type_file'")
 
         # Get metadata values
         file_id = str(metadata['file_id'])
+        file_type = str(metadata['file_type'])
         file_name = str(metadata['file_name'])
-        source_id = str(metadata.get('source_id', file_id))
-        type_file = str(metadata['type_file'])
-        total_pages = str(metadata.get('total_pages', metadata.get('num_pages', '0')))
-        total_chapters = str(metadata.get('total_chapters', metadata.get('chapters', '')))
-        total_num_image = str(metadata.get('total_num_image', metadata.get('num_image', '0')))
-
-
-        # Get current date
+        full_pages = str(metadata.get('full_pages', '0'))
+        chapters = str(metadata.get('chapters', 'false'))
+        full_images = str(metadata.get('full_images', '0'))
         current_date = datetime.now().date().strftime('%Y-%m-%d')
 
         data = {
+            "file_id": file_id,
+            "file_type": file_type,
+            "file_name": file_name,
             "text": summary,
             "text_embedding": embedding,
-            "image_embedding": "",
-            "audio_embedding": "",
+            "pages": full_pages,
+            "chapters": chapters,
+            "image_number": "",
+            "image_number_in_page": "",
+            "full_images": full_images,
             "date": current_date,
-            "source_id": source_id,
-            "file_id": file_id,
-            "file_name": file_name,
-            "type_file": type_file,
-            "total_pages": total_pages,
-            "total_chapters": total_chapters,
-            "total_num_image": total_num_image,
         }
 
         logger.info(
