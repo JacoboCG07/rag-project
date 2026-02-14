@@ -119,10 +119,14 @@ class TextUploader:
                 (chunks, embeddings, chunks_metadata).
         """
         # Step 1: Chunk pages using TextProcessor
-        chunks, chunks_metadata = self._text_processor.process(pages=content)
+        chunks, chunks_metadata = self._text_processor.process_to_chunks(pages=content)
 
         # Step 2: Generate embeddings for chunks using ChunkProcessor
-        chunks, embeddings = self._chunk_processor.process(chunks=chunks)
+        chunks, embeddings, chunks_metadata = self._chunk_processor.process_to_embeddings(
+            chunks=chunks,
+            chunks_metadata=chunks_metadata,
+            max_acceptable_loss=0.10,
+        )
 
         return chunks, embeddings, chunks_metadata
 
