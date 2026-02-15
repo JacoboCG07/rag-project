@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional, Tuple, Callable
 
 from src.utils import get_logger
 
-from ...types import ExtractionResult
+from ...types import ExtractionResult, MetadataType
 from ..milvus.milvus_client import MilvusClient
 
 class SummaryUploader:
@@ -76,16 +76,17 @@ class SummaryUploader:
 
             content = document_data.content
             images = document_data.images or []
-            metadata_obj = document_data.metadata
+            metadata_obj: MetadataType = document_data.metadata
 
             if not content or not isinstance(content, list):
                 self.logger.error("content must be a non-empty list of texts")
                 raise ValueError("content must be a non-empty list of texts")
 
-            # Get file_name and file_type from metadata
+            # Get file_name, file_type, and chapters from metadata
             file_name = metadata_obj.file_name
             file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
-            
+            chapters = getattr(metadata_obj, 'chapters', False)
+
             num_images = len(images) if images else 0
 
             self.logger.debug(
