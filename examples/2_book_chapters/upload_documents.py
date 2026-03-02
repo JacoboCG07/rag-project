@@ -16,8 +16,8 @@ from pathlib import Path
 root_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
-from src.rag.rag_pipeline import RAGPipeline
-from src.rag.config import RAGPipelineConfig
+from src.ingestion.ingestion_pipeline import IngestionPipeline
+from src.ingestion.config import IngestionPipelineConfig
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -49,9 +49,9 @@ def upload_documents():
     try:
         # Configurar el RAG Pipeline
         # Nota: Ajusta la configuración según tus necesidades
-        config = RAGPipelineConfig()
+        config = IngestionPipelineConfig()
         
-        with RAGPipeline(config=config) as pipeline:
+        with IngestionPipeline(config=config) as pipeline:
             print(f"{'─' * 80}")
             print(f"Procesando: {book_file.name}")
             print('─' * 80)

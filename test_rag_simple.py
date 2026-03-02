@@ -11,8 +11,8 @@ project_root = Path(__file__).parent
 src_path = project_root / "src"
 sys.path.insert(0, str(src_path))
 
-from rag.config import RAGPipelineConfig
-from rag.rag_pipeline import RAGPipeline
+from ingestion.config import IngestionPipelineConfig
+from ingestion.ingestion_pipeline import IngestionPipeline
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     # 1. Crear configuración
     print("\n1. Creando configuración...")
     try:
-        config = RAGPipelineConfig()
+        config = IngestionPipelineConfig()
         print(f"   [OK] Base de datos: {config.milvus.dbname}")
         print(f"   [OK] Host: {config.milvus.host}:{config.milvus.port}")
         print(f"   [OK] Collection documentos: {config.collection_name_documents}")
@@ -37,7 +37,7 @@ def main():
     # 2. Crear pipeline
     print("\n2. Inicializando pipeline...")
     try:
-        pipeline = RAGPipeline(config=config)
+        pipeline = IngestionPipeline(config=config)
         print("   [OK] Pipeline creado")
     except Exception as e:
         print(f"   [ERROR] Error creando pipeline: {e}")

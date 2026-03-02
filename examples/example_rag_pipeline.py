@@ -1,8 +1,8 @@
 """
 Example usage of RAG Pipeline with configuration
 """
-from src.rag.config import RAGPipelineConfig, SearchPipelineConfig, MilvusConfig
-from src.rag.rag_pipeline import RAGPipeline
+from src.ingestion.config import IngestionPipelineConfig, SearchPipelineConfig, MilvusConfig
+from src.ingestion.ingestion_pipeline import IngestionPipeline
 from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 
 # Example 1: Using default configuration (from environment variables)
@@ -10,13 +10,13 @@ def example_default_config():
     """Example using default configuration from environment variables"""
     
     # Create default config
-    config = RAGPipelineConfig()
+    config = IngestionPipelineConfig()
     
     # Initialize embedder
     embedder = OpenAIEmbedder()
     
     # Create pipeline
-    pipeline = RAGPipeline(
+    pipeline = IngestionPipeline(
         config=config,
         generate_embeddings_func=lambda text: embedder.generate_embedding(text=text)[0]
     )
@@ -42,8 +42,8 @@ def example_custom_config():
         port="19530"
     )
     
-    # Create custom RAG config
-    config = RAGPipelineConfig(
+    # Create custom Ingestion config
+    config = IngestionPipelineConfig(
         milvus=milvus_config,
         collection_name_documents="my_documents",
         collection_name_summaries="my_summaries",
@@ -62,7 +62,7 @@ def example_custom_config():
         # Your summary generation logic here
         return f"Summary of: {text[:100]}..."
     
-    pipeline = RAGPipeline(
+    pipeline = IngestionPipeline(
         config=config,
         generate_embeddings_func=lambda text: embedder.generate_embedding(text=text)[0],
         generate_summary_func=generate_summary

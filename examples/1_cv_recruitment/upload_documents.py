@@ -26,12 +26,13 @@ if sys.platform == 'win32':
 root_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
-from src.rag.rag_pipeline import RAGPipeline
-from src.rag.config import RAGPipelineConfig
+from src.ingestion.ingestion_pipeline import IngestionPipeline
+from src.ingestion.config import IngestionPipelineConfig
 from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "example_1"
 
 def upload_documents():
     """Sube e indexa todos los documentos del ejemplo en Milvus"""
@@ -46,10 +47,10 @@ def upload_documents():
     # Lista de documentos a procesar
     expected_files = [
         "job_proposal.pdf",
-        "cv_candidate_1.pdf",
-        "cv_candidate_2.pdf",
-        "cv_candidate_3.pdf",
-        "cv_candidate_4.pdf"
+        # "cv_candidate_1.pdf",
+        # "cv_candidate_2.pdf",
+        # "cv_candidate_3.pdf",
+        # "cv_candidate_4.pdf",
     ]
     
     # Obtener rutas de los archivos
@@ -63,10 +64,14 @@ def upload_documents():
     
     try:
         # Configurar el RAG Pipeline
-        # Nota: Ajusta la configuración según tus necesidades
-        config = RAGPipelineConfig(collection_name=collection_name)
+        # Opciones: chunk_size, chunk_overlap, extract_images
+        config = IngestionPipelineConfig(
+            collection_name=collection_name,
+            chunk_size=2000,
+            extract_images=False,
+        )
         
-        with RAGPipeline(config=config) as pipeline:
+        with IngestionPipeline(config=config) as pipeline:
             successful = 0
             failed = 0
             
@@ -83,7 +88,8 @@ def upload_documents():
                     # Los documentos van a la partición 'documents' y los resúmenes a 'summaries'
                     success, message, result_info = pipeline.process_single_file(
                         file_path=str(file_path),
-                        extract_process_images=False
+                        extract_process_images=False,
+                        job_id=JOB_ID
                     )
                     
                     if success:

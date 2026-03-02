@@ -1,2 +1,0 @@
-# PDF extractor tests
-

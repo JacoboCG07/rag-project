@@ -4,7 +4,7 @@ Module for retrieving document summaries from Milvus
 
 from typing import List, Optional
 from pymilvus import Collection
-from src.rag.processing.milvus.milvus_client import MilvusClient
+from src.ingestion.processing.milvus.milvus_client import MilvusClient
 from src.search.models import DocumentSummary
 from src.utils import get_logger
 

@@ -195,6 +195,7 @@ class OpenAIEmbedder(BaseEmbedder):
         instance.api_key = config["api_key"]
         instance.model = config["model"]
         instance.count_tokens = config["count_tokens"]
+        instance.logger = get_logger(__name__)
         # Create client in worker process
         instance.client = OpenAI(api_key=instance.api_key)
         # Calculate dimensions based on model
@@ -207,4 +208,3 @@ class OpenAIEmbedder(BaseEmbedder):
                 f"If this is a new model, please add it to MODEL_DIMENSIONS mapping."
             )
         return instance
-
