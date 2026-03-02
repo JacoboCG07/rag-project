@@ -1,11 +1,11 @@
 """
-Módulo para buscar documentos en Milvus
+Module for searching documents in Milvus.
 """
 from typing import List, Dict, Optional
 import sys
 import os
 
-# Agregar la ruta de libraries-main si existe
+# Add libraries-main path if it exists
 libraries_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "libraries-main")
 if os.path.exists(libraries_path):
     sys.path.insert(0, libraries_path)
@@ -19,16 +19,16 @@ from pymilvus import Collection, connections, db, utility
 
 
 class MilvusSearcher:
-    """Clase para buscar documentos en Milvus"""
+    """Class for searching documents in Milvus."""
     
     def __init__(self, db_name: str, collection_name: str, alias: str = "default"):
         """
-        Inicializa el buscador de Milvus
-        
+        Initializes the Milvus searcher.
+
         Args:
-            db_name: Nombre de la base de datos
-            collection_name: Nombre de la colección
-            alias: Alias para la conexión
+            db_name: Database name.
+            collection_name: Collection name.
+            alias: Connection alias.
         """
         self.db_name = db_name
         self.collection_name = collection_name
@@ -36,7 +36,7 @@ class MilvusSearcher:
         self.collection = None
     
     def connect(self):
-        """Conecta a Milvus y carga la colección"""
+        """Connects to Milvus and loads the collection."""
         if controlMilvus:
             self.collection = controlMilvus.load_db_and_collection(
                 dbname=self.db_name,
@@ -44,7 +44,7 @@ class MilvusSearcher:
                 alias=self.alias
             )
         else:
-            # Implementación alternativa usando pymilvus directamente
+            # Alternative implementation using pymilvus directly
             from dotenv import load_dotenv
             load_dotenv()
             
@@ -53,7 +53,7 @@ class MilvusSearcher:
             
             connections.connect(host=host, port=port, alias=self.alias)
             
-            # Listar bases de datos y crear si no existe
+            # List databases and create if it doesn't exist
             dbs = db.list_database(using=self.alias)
             if self.db_name not in dbs:
                 db.create_database(self.db_name, using=self.alias)
@@ -69,25 +69,25 @@ class MilvusSearcher:
         filter_expr: Optional[str] = None
     ) -> List[Dict]:
         """
-        Busca documentos similares en Milvus
-        
+        Searches for similar documents in Milvus.
+
         Args:
-            query_embedding: Embedding de la query
-            limit: Número máximo de resultados
-            partition_names: Lista de particiones donde buscar (None = todas)
-            filter_expr: Expresión de filtro opcional (ej: 'file_id == "123"')
-            
+            query_embedding: Query embedding.
+            limit: Maximum number of results.
+            partition_names: List of partitions to search (None = all).
+            filter_expr: Optional filter expression (e.g. 'file_id == "123"').
+
         Returns:
-            Lista de documentos encontrados con sus scores
+            List of documents found with their scores.
         """
         try:
-            # Preparar parámetros de búsqueda
+            # Prepare search parameters
             search_params = {
                 "metric_type": "COSINE",
                 "params": {"nprobe": 10}
             }
             
-            # Realizar búsqueda
+            # Execute search
             results = self.collection.search(
                 data=[query_embedding],
                 anns_field="text_embedding",
@@ -95,10 +95,10 @@ class MilvusSearcher:
                 limit=limit,
                 partition_names=partition_names,
                 expr=filter_expr,
-                output_fields=["text", "file_id", "file_name", "source_id", "pages", "chapters", "type_file"]
+                output_fields=["text", "file_id", "file_name", "file_type", "pages", "chapters"]
             )
             
-            # Procesar resultados
+            # Process results
             documents = []
             if results:
                 for hit in results[0]:
@@ -108,17 +108,17 @@ class MilvusSearcher:
                         "text": hit.entity.get("text", ""),
                         "file_id": hit.entity.get("file_id", ""),
                         "file_name": hit.entity.get("file_name", ""),
-                        "source_id": hit.entity.get("source_id", ""),
+                        "source_id": hit.entity.get("file_id", ""),  # file_id used as source_id for SearchResult
                         "pages": hit.entity.get("pages", ""),
                         "chapters": hit.entity.get("chapters", ""),
-                        "type_file": hit.entity.get("type_file", "")
+                        "type_file": hit.entity.get("file_type", ""),
                     }
                     documents.append(doc)
             
             return documents
             
         except Exception as e:
-            raise Exception(f"Error buscando en Milvus: {str(e)}")
+            raise Exception(f"Error searching in Milvus: {str(e)}")
     
     def search_by_partition(
         self,
@@ -127,15 +127,15 @@ class MilvusSearcher:
         limit: int = 10
     ) -> List[Dict]:
         """
-        Busca documentos en una partición específica
-        
+        Searches for documents in a specific partition.
+
         Args:
-            query_embedding: Embedding de la query
-            partition_name: Nombre de la partición
-            limit: Número máximo de resultados
-            
+            query_embedding: Query embedding.
+            partition_name: Partition name.
+            limit: Maximum number of results.
+
         Returns:
-            Lista de documentos encontrados
+            List of documents found.
         """
         return self.search(
             query_embedding=query_embedding,
@@ -145,21 +145,21 @@ class MilvusSearcher:
     
     def get_partitions(self) -> List[str]:
         """
-        Obtiene la lista de particiones disponibles en la colección
-        
+        Gets the list of partitions available in the collection.
+
         Returns:
-            Lista de nombres de particiones
+            List of partition names.
         """
         try:
             partitions = self.collection.partitions
-            # Filtrar la partición default
+            # Filter out the default partition
             partition_names = [p.name for p in partitions if p.name != "_default"]
             return partition_names
         except Exception as e:
-            raise Exception(f"Error obteniendo particiones: {str(e)}")
+            raise Exception(f"Error getting partitions: {str(e)}")
     
     def disconnect(self):
-        """Cierra la conexión con Milvus"""
+        """Closes the connection to Milvus."""
         if controlMilvus:
             controlMilvus.finish_conection_and_release_collection(
                 alias=self.alias,

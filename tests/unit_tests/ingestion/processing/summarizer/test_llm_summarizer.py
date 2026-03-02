@@ -1,24 +1,20 @@
 """
 Tests for LLMSummarizer
+$env:PYTHONPATH="$PWD"; pytest tests/unit_tests/ingestion/processing/summarizer
 """
 import pytest
 from pathlib import Path
 import sys
 from unittest.mock import Mock, patch, MagicMock
 
-# Add src to path
-# Calculate project root: go up from test file to project root
-# test_llm_summarizer.py -> summarizer/ -> processing/ -> ingestion/ -> unit_tests/ -> tests/ -> project_root
+# Add project root to path so that "src" is a package (same as production)
 _current_file = Path(__file__).resolve()
 project_root = _current_file.parent.parent.parent.parent.parent.parent
-src_path = project_root / "src"
-if src_path.exists():
-    sys.path.insert(0, str(src_path))
-else:
-    raise ImportError(f"Could not find src directory at {src_path}")
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from ingestion.processing.summarizer.llm_summarizer import LLMSummarizer
-from llms.text.base_text_model import BaseTextModel
+from src.ingestion.processing.summarizer.llm_summarizer import LLMSummarizer
+from src.llms.text.base_text_model import BaseTextModel
 
 
 class MockTextModel(BaseTextModel):
@@ -58,7 +54,7 @@ def mock_text_model():
 @pytest.fixture
 def mock_prompt_loader():
     """Mocks PromptLoader.read_file"""
-    with patch('ingestion.processing.summarizer.llm_summarizer.PromptLoader.read_file') as mock_read:
+    with patch('src.ingestion.processing.summarizer.llm_summarizer.PromptLoader.read_file') as mock_read:
         mock_read.return_value = "System prompt for summarization"
         yield mock_read
 
@@ -133,4 +129,7 @@ class TestLLMSummarizer:
         assert system_prompt == "System prompt for summarization"
         assert isinstance(prompt, str)
         assert isinstance(system_prompt, str)
-        mock_prompt_loader.assert_called_once_with("src/ingestion/processing/summarizer/summarizer_prompt.md")
+        mock_prompt_loader.assert_called_once()
+        # El código usa Path(__file__).parent / "summarizer_prompt.md" → ruta absoluta
+        call_path = mock_prompt_loader.call_args[0][0]
+        assert call_path.replace("\\", "/").endswith("summarizer/summarizer_prompt.md")

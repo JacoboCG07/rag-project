@@ -1,10 +1,14 @@
 """
-Base interface for text chunkers
-Implements Strategy pattern to allow different chunking strategies
+Base interface for text chunkers.
+
+Define un contrato común basado en DTOs para las diferentes
+estrategias de chunking.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional
+from typing import List
+
+from .dto import BaseChunkDTO
 
 
 class BaseChunker(ABC):
@@ -18,21 +22,15 @@ class BaseChunker(ABC):
         self,
         *,
         texts: List[str],
-        return_metadata: bool = False
-    ) -> List[str] | Tuple[List[str], List[dict]]:
+    ) -> List[BaseChunkDTO]:
         """
-        Chunks a list of texts into smaller segments.
+        Divide una lista de textos en chunks más pequeños.
 
         Args:
-            texts: List of texts to chunk (typically pages).
-            return_metadata: If True, returns metadata (pages, chapters) along with chunks.
+            texts: Lista de textos a trocear (típicamente páginas).
 
         Returns:
-            If return_metadata=False: List[str] - List of chunked texts.
-            If return_metadata=True: Tuple[List[str], List[dict]] - (chunks, metadata_list)
-                where metadata_list contains dicts with:
-                - 'pages': List[int] - Pages of the chunk
-                - 'chapters': str or List[str] - Chapters of the chunk
+            List[BaseChunkDTO]: Lista de DTOs, uno por chunk generado.
         """
         pass
 

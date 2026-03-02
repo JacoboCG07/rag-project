@@ -31,8 +31,7 @@ class DocumentProcessor:
         host: Optional[str] = None,
         port: Optional[str] = None,
         chunk_size: int = 2000,
-        chunk_overlap: int = 0,
-        detect_chapters: bool = True
+        chunk_overlap: int = 0
     ):
         """
         Initializes the document processor with Milvus client.
@@ -52,7 +51,6 @@ class DocumentProcessor:
             port: Milvus port (optional).
             chunk_size: Maximum size of each chunk in characters (default 2000).
             chunk_overlap: Number of characters to overlap between chunks (default 0).
-            detect_chapters: Whether to detect chapters in documents (default True).
         """
 
         # Usar una sola colección para documentos y resúmenes
@@ -89,8 +87,7 @@ class DocumentProcessor:
                 "embedding_dim": embedding_dim,
                 "has_describe_image_func": describe_image_func is not None,
                 "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "detect_chapters": detect_chapters
+                "chunk_overlap": chunk_overlap
             }
         )
 
@@ -100,8 +97,7 @@ class DocumentProcessor:
             generate_embeddings_func=generate_embeddings_func,
             describe_image_func=describe_image_func,
             chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            detect_chapters=detect_chapters
+            chunk_overlap=chunk_overlap
         )
         
         # Initialize SummaryProcessor (generate_summary_func is always provided via config)

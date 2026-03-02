@@ -1,24 +1,21 @@
 """
 Tests for LLMImageDescriber
+
+$env:PYTHONPATH="$PWD"; pytest tests/unit_tests/ingestion/processing/describer/test_llm_image_describer.py
 """
 import pytest
 from pathlib import Path
 import sys
 from unittest.mock import Mock, patch
 
-# Add src to path
-# Calculate project root: go up from test file to project root
-# test_llm_image_describer.py -> describer/ -> processing/ -> ingestion/ -> unit_tests/ -> tests/ -> project_root
+# Add project root to path so that "src" is a package (same as production)
 _current_file = Path(__file__).resolve()
 project_root = _current_file.parent.parent.parent.parent.parent.parent
-src_path = project_root / "src"
-if src_path.exists():
-    sys.path.insert(0, str(src_path))
-else:
-    raise ImportError(f"Could not find src directory at {src_path}")
+if project_root not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from ingestion.processing.describer.llm_image_describer import LLMImageDescriber
-from llms.vision.base_vision_model import BaseVisionModel
+from src.llms.vision import BaseVisionModel
+from src.ingestion.processing.describer.llm_image_describer import LLMImageDescriber
 
 
 class MockVisionModel(BaseVisionModel):
@@ -58,7 +55,7 @@ def mock_vision_model():
 @pytest.fixture
 def mock_prompt_loader():
     """Mocks PromptLoader.read_file"""
-    with patch('ingestion.processing.describer.llm_image_describer.PromptLoader.read_file') as mock_read:
+    with patch('src.ingestion.processing.describer.llm_image_describer.PromptLoader.read_file') as mock_read:
         mock_read.return_value = "System prompt for image description"
         yield mock_read
 

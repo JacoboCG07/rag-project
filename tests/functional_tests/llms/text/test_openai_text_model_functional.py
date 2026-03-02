@@ -8,23 +8,18 @@ from pathlib import Path
 import sys
 from dotenv import load_dotenv
 
-# Add src to path
-# Calculate project root: go up from test file to project root
-# test_openai_text_model_functional.py -> text/ -> llms/ -> functional_tests/ -> tests/ -> project_root
+# Add project root to path so that "src" is a package (same as production)
 _current_file = Path(__file__).resolve()
 project_root = _current_file.parent.parent.parent.parent.parent
-src_path = project_root / "src"
-if src_path.exists():
-    sys.path.insert(0, str(src_path))
-else:
-    raise ImportError(f"Could not find src directory at {src_path}")
+if project_root not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Load .env file from project root
 env_path = project_root / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-from llms.text.openai_text_model import OpenAITextModel, OPENAI_AVAILABLE
+from src.llms.text.openai_text_model import OpenAITextModel, OPENAI_AVAILABLE
 
 
 # Skip all tests if OpenAI package is not available

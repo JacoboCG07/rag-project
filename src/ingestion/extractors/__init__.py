@@ -1,9 +1,9 @@
 """
 Document extractors module
 """
-from .base import BaseDocumentExtractor
-from .pdf import PDFExtractor
-from .txt import TXTExtractor
+from .base_extractor import BaseDocumentExtractor
+from .pdf_extractor import PDFExtractor
+from .txt_extractor import TXTExtractor
 from .factory import DocumentExtractorFactory
 from .document_extraction_manager import DocumentExtractionManager
 

@@ -23,7 +23,6 @@ class TextUploader:
         generate_embeddings_func: Callable[[str], Any],
         chunk_size: int = 2000,
         chunk_overlap: int = 0,
-        detect_chapters: bool = True,
     ):
         """
         Initializes the text uploader.
@@ -33,7 +32,6 @@ class TextUploader:
             generate_embeddings_func: Function to generate embeddings.
             chunk_size: Maximum size of each chunk in characters.
             chunk_overlap: Number of characters to overlap between chunks.
-            detect_chapters: Whether to detect chapters in text.
         """
         self.milvus_client = milvus_client
         self.logger = get_logger(__name__)
@@ -42,7 +40,6 @@ class TextUploader:
         self._text_processor = TextProcessor(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            detect_chapters=detect_chapters,
         )
         self._chunk_processor = ChunkProcessor(
             generate_embeddings_func=generate_embeddings_func
@@ -53,7 +50,6 @@ class TextUploader:
             extra={
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
-                "detect_chapters": detect_chapters,
             },
         )
 

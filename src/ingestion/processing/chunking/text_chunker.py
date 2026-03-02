@@ -1,12 +1,16 @@
 """
 Text chunker implementation
-Based on existing logic with improvements for overlap and flexibility
+Based on existing logic with improvements for overlap and flexibility.
+
+Devuelve siempre DTOs (`BaseChunkDTO`) para
+estandarizar la salida del proceso de chunking.
 """
 
 import re
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 from .base_chunker import BaseChunker
+from .dto import BaseChunkDTO, ChunkMetadata
 from src.utils import get_logger
 
 
@@ -21,8 +25,7 @@ class TextChunker(BaseChunker):
         self,
         *,
         chunk_size: int = 2000,
-        overlap: int = 0,
-        detect_chapters: bool = True
+        overlap: int = 0
     ):
         """
         Initializes the text chunker.
@@ -30,11 +33,9 @@ class TextChunker(BaseChunker):
         Args:
             chunk_size: Maximum size of each chunk (default 2000 characters).
             overlap: Number of characters to overlap between chunks (default 0).
-            detect_chapters: Whether to detect chapters in text (default True).
         """
         self.chunk_size = chunk_size
         self.overlap = overlap
-        self.detect_chapters = detect_chapters
         self.logger = get_logger(__name__)
         
         self.logger.info(
@@ -42,7 +43,6 @@ class TextChunker(BaseChunker):
             extra={
                 "chunk_size": chunk_size,
                 "overlap": overlap,
-                "detect_chapters": detect_chapters
             }
         )
 
@@ -50,23 +50,19 @@ class TextChunker(BaseChunker):
         self,
         *,
         texts: List[str],
-        return_metadata: bool = False
-    ) -> List[str] | Tuple[List[str], List[dict]]:
+    ) -> List[BaseChunkDTO]:
         """
-        Chunks a list of texts into smaller segments.
+        Chunks a list of texts into smaller segments and returns DTOs.
 
         Args:
             texts: List of texts to chunk (typically pages).
-            return_metadata: If True, returns metadata (pages, chapters) along with chunks.
 
         Returns:
-            If return_metadata=False: List[str] - List of chunked texts.
-            If return_metadata=True: Tuple[List[str], List[dict]] - (chunks, metadata_list)
-                where metadata_list contains dicts with 'pages' and optionally 'chapters'.
+            List[BaseChunkDTO]: Lista de DTOs con el texto del chunk y sus metadatos.
         """
         if not texts:
             self.logger.debug("Empty texts list provided, returning empty result")
-            return [] if not return_metadata else ([], [])
+            return []
 
         self.logger.debug(
             "Starting text chunking",
@@ -74,8 +70,6 @@ class TextChunker(BaseChunker):
                 "input_texts_count": len(texts),
                 "chunk_size": self.chunk_size,
                 "overlap": self.overlap,
-                "detect_chapters": self.detect_chapters,
-                "return_metadata": return_metadata
             }
         )
 
@@ -88,38 +82,39 @@ class TextChunker(BaseChunker):
             pages=pages
         )
 
-        # Step 3: Detect chapters if enabled
-        chapters = None
-        if self.detect_chapters:
-            chapters = self._get_chapters_of_segments(segments=chunks)
+        # Step 3: Detect chapters (always enabled)
+        chapters = self._get_chapters_of_segments(segments=chunks)
 
-        if return_metadata:
-            metadata_list = []
-            for i, pages_group in enumerate(pages_groups):
-                metadata = {
-                    'pages': pages_group,
-                    'chapters': chapters[i] if chapters and i < len(chapters) and chapters[i] else ""
-                }
-                metadata_list.append(metadata)
-            
-            self.logger.info(
-                "Text chunking completed with metadata",
-                extra={
-                    "input_texts_count": len(texts),
-                    "chunks_count": len(chunks),
-                    "chapters_detected": sum(1 for c in chapters if c) if chapters else 0
-                }
+        # Build DTOs
+        dto_list: List[BaseChunkDTO] = []
+        for i, chunk_text in enumerate(chunks):
+            pages_group = pages_groups[i] if i < len(pages_groups) else []
+            chapter_list = (
+                chapters[i]
+                if i < len(chapters) and chapters[i]
+                else None
             )
-            return chunks, metadata_list
+
+            metadata = ChunkMetadata(
+                pages=pages_group,
+                chapters=chapter_list,
+            )
+
+            dto = BaseChunkDTO(
+                text=chunk_text,
+                metadata=metadata,
+            )
+            dto_list.append(dto)
 
         self.logger.info(
             "Text chunking completed",
             extra={
                 "input_texts_count": len(texts),
-                "chunks_count": len(chunks)
+                "chunks_count": len(dto_list),
+                "chapters_detected": sum(1 for c in chapters if c),
             }
         )
-        return chunks
+        return dto_list
 
     def _ensure_length_segments(
         self,

@@ -24,7 +24,6 @@ class DocumentUploader:
         describe_image_func: Optional[Callable[[str], str]] = None,
         chunk_size: int = 2000,
         chunk_overlap: int = 0,
-        detect_chapters: bool = True,
     ):
         """
         Initializes the document uploader.
@@ -35,7 +34,6 @@ class DocumentUploader:
             describe_image_func: Function to describe image (optional).
             chunk_size: Maximum size of each chunk in characters.
             chunk_overlap: Number of characters to overlap between chunks.
-            detect_chapters: Whether to detect chapters in documents.
         """
         self.logger = get_logger(__name__)
 
@@ -45,7 +43,6 @@ class DocumentUploader:
             generate_embeddings_func=generate_embeddings_func,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            detect_chapters=detect_chapters,
         )
 
         self._image_uploader = ImageUploader(
@@ -60,7 +57,6 @@ class DocumentUploader:
                 "has_describe_image_func": describe_image_func is not None,
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
-                "detect_chapters": detect_chapters,
             },
         )
 

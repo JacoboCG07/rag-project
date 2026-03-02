@@ -6,6 +6,7 @@ Prepares document chunks for insertion into Milvus
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from src.utils import get_logger
+from .milvus_insert_dto import SCHEMA_KEYS, build_milvus_insert_dict
 
 
 class DocumentPreparer:
@@ -32,8 +33,7 @@ class DocumentPreparer:
             file_metadata: File-level metadata (common to all chunks) with:
                 - file_id: str (required)
                 - file_name: str (required)
-                - source_id: str (optional, uses file_id if not provided)
-                - type_file: str (required)
+                - type_file: str (required, mapped to file_type for schema)
             chunks_metadata: List of chunk-level metadata dictionaries (one per chunk) with:
                 - pages: int, str, or List[int] (optional)
                 - chapters: str or List[str] (optional)
@@ -82,8 +82,19 @@ class DocumentPreparer:
         # Get file-level metadata values
         file_id = str(file_metadata['file_id'])
         file_name = str(file_metadata['file_name'])
-        source_id = str(file_metadata.get('source_id', file_id))
-        type_file = str(file_metadata['type_file'])
+        file_type = str(file_metadata['type_file'])  # schema uses file_type
+
+        # Log dropped keys: file_metadata
+        dropped_file = set(file_metadata.keys()) - SCHEMA_KEYS
+        if dropped_file:
+            logger.debug(
+                "Fields not in schema, not added to insert",
+                extra={
+                    "dropped_keys": list(dropped_file),
+                    "source": "file_metadata",
+                    "file_id": file_id,
+                },
+            )
 
         # Initialize chunks_metadata if not provided
         if chunks_metadata is None:
@@ -93,6 +104,20 @@ class DocumentPreparer:
                 f"Number of chunks_metadata ({len(chunks_metadata)}) must match "
                 f"number of texts ({len(texts)})"
             )
+
+        # Log dropped keys: chunks_metadata
+        for i, chunk_meta in enumerate(chunks_metadata):
+            dropped_chunk = set(chunk_meta.keys()) - SCHEMA_KEYS
+            if dropped_chunk:
+                logger.debug(
+                    "Fields not in schema, not added to insert",
+                    extra={
+                        "dropped_keys": list(dropped_chunk),
+                        "source": "chunks_metadata",
+                        "file_id": file_id,
+                        "chunk_index": i,
+                    },
+                )
 
         # Get current date
         current_date = datetime.now().date().strftime('%Y-%m-%d')
@@ -128,26 +153,24 @@ class DocumentPreparer:
             image_number_in_page = chunk_meta.get('image_number_in_page', "")
             image_number_in_page_str = str(image_number_in_page) if image_number_in_page else ""
 
-            data = {
-                "text": text,
-                "text_embedding": embedding,
-                "date": current_date,
-                "source_id": source_id,
-                "file_id": file_id,
-                "file_name": file_name,
-                "type_file": type_file,
-                "pages": pages_str,
-                "chapters": chapters_str,
-                "image_number": image_number_str,
-                "image_number_in_page": image_number_in_page_str,
-            }
-
+            data = build_milvus_insert_dict(
+                file_id=file_id,
+                file_name=file_name,
+                file_type=file_type,
+                text=text,
+                text_embedding=embedding,
+                date=current_date,
+                pages=pages_str,
+                chapters=chapters_str,
+                image_number=image_number_str,
+                image_number_in_page=image_number_in_page_str,
+            )
             prepared_data.append(data)
 
         logger.info(
-            "Image descriptions prepared successfully",
+            "Document chunks prepared successfully",
             extra={
-                "images_count": len(prepared_data),
+                "chunks_count": len(prepared_data),
                 "file_id": file_id,
                 "file_name": file_name
             }
@@ -173,8 +196,7 @@ class DocumentPreparer:
             file_metadata: File-level metadata (common to all images) with:
                 - file_id: str (required)
                 - file_name: str (required)
-                - source_id: str (optional, uses file_id if not provided)
-                - type_file: str (required, typically "image_<file_type>")
+                - type_file: str (required, mapped to file_type for schema)
             images_metadata: List of image-level metadata dictionaries (one per image) with:
                 - pages: int or str (optional)
                 - image_number: int or str (optional, default "")
@@ -225,8 +247,19 @@ class DocumentPreparer:
         # Get file-level metadata values
         file_id = str(file_metadata['file_id'])
         file_name = str(file_metadata['file_name'])
-        source_id = str(file_metadata.get('source_id', file_id))
-        type_file = str(file_metadata['type_file'])
+        file_type = str(file_metadata['type_file'])  # schema uses file_type
+
+        # Log dropped keys: file_metadata
+        dropped_file = set(file_metadata.keys()) - SCHEMA_KEYS
+        if dropped_file:
+            logger.debug(
+                "Fields not in schema, not added to insert",
+                extra={
+                    "dropped_keys": list(dropped_file),
+                    "source": "file_metadata",
+                    "file_id": file_id,
+                },
+            )
 
         # Initialize images_metadata if not provided
         if images_metadata is None:
@@ -236,6 +269,20 @@ class DocumentPreparer:
                 f"Number of images_metadata ({len(images_metadata)}) must match "
                 f"number of image_descriptions ({len(image_descriptions)})"
             )
+
+        # Log dropped keys: images_metadata
+        for i, image_meta in enumerate(images_metadata):
+            dropped_image = set(image_meta.keys()) - SCHEMA_KEYS
+            if dropped_image:
+                logger.debug(
+                    "Fields not in schema, not added to insert",
+                    extra={
+                        "dropped_keys": list(dropped_image),
+                        "source": "images_metadata",
+                        "file_id": file_id,
+                        "image_index": i,
+                    },
+                )
 
         # Get current date
         current_date = datetime.now().date().strftime('%Y-%m-%d')
@@ -257,22 +304,18 @@ class DocumentPreparer:
             image_number_in_page = image_meta.get('image_number_in_page', "")
             image_number_in_page_str = str(image_number_in_page) if image_number_in_page else ""
 
-            data = {
-                "text": description,
-                "text_embedding": embedding,
-                "image_embedding": "",
-                "audio_embedding": "",
-                "date": current_date,
-                "source_id": source_id,
-                "file_id": file_id,
-                "file_name": file_name,
-                "type_file": type_file,
-                "pages": pages_str,
-                "chapters": "",
-                "image_number": image_number_str,
-                "image_number_in_page": image_number_in_page_str,
-            }
-
+            data = build_milvus_insert_dict(
+                file_id=file_id,
+                file_name=file_name,
+                file_type=file_type,
+                text=description,
+                text_embedding=embedding,
+                date=current_date,
+                pages=pages_str,
+                chapters="",
+                image_number=image_number_str,
+                image_number_in_page=image_number_in_page_str,
+            )
             prepared_data.append(data)
 
         return prepared_data

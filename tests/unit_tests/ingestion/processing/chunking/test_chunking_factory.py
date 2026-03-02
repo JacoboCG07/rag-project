@@ -31,33 +31,30 @@ class TestChunkingFactory:
         assert isinstance(chunker, TextChunker)
         assert chunker.chunk_size == 2000
         assert chunker.overlap == 0
-        assert chunker.detect_chapters is True
     
-    def test_create_chunker_characters_strategy(self):
-        """Test create_chunker with 'characters' strategy"""
-        chunker = ChunkingFactory.create_chunker(strategy="characters")
+    def test_create_chunker_default_strategy_explicit(self):
+        """Test create_chunker with explicit 'default' strategy"""
+        chunker = ChunkingFactory.create_chunker(strategy="default")
         
         assert isinstance(chunker, TextChunker)
     
     def test_create_chunker_custom_parameters(self):
         """Test create_chunker with custom parameters"""
         chunker = ChunkingFactory.create_chunker(
-            strategy="characters",
+            strategy="default",
             chunk_size=1000,
-            overlap=100,
-            detect_chapters=False
+            overlap=100
         )
         
         assert isinstance(chunker, TextChunker)
         assert chunker.chunk_size == 1000
         assert chunker.overlap == 100
-        assert chunker.detect_chapters is False
     
     def test_create_chunker_case_insensitive(self):
         """Test create_chunker with case insensitive strategy name"""
-        chunker1 = ChunkingFactory.create_chunker(strategy="CHARACTERS")
-        chunker2 = ChunkingFactory.create_chunker(strategy="characters")
-        chunker3 = ChunkingFactory.create_chunker(strategy="Characters")
+        chunker1 = ChunkingFactory.create_chunker(strategy="DEFAULT")
+        chunker2 = ChunkingFactory.create_chunker(strategy="default")
+        chunker3 = ChunkingFactory.create_chunker(strategy="Default")
         
         assert isinstance(chunker1, TextChunker)
         assert isinstance(chunker2, TextChunker)
@@ -75,7 +72,7 @@ class TestChunkingFactory:
         """Test register_strategy method"""
         # Create a mock chunker class for testing
         class MockChunker(BaseChunker):
-            def chunk(self, *, texts, return_metadata=False):
+            def chunk(self, *, texts):
                 return []
         
         # Register the new strategy
@@ -91,7 +88,7 @@ class TestChunkingFactory:
     
     def test_create_chunker_whitespace_trimming(self):
         """Test that strategy name is trimmed of whitespace"""
-        chunker = ChunkingFactory.create_chunker(strategy="  characters  ")
+        chunker = ChunkingFactory.create_chunker(strategy="  default  ")
         
         assert isinstance(chunker, TextChunker)
     
@@ -107,4 +104,6 @@ class TestChunkingFactory:
         
         assert isinstance(result, list)
         assert len(result) > 0
+        assert hasattr(result[0], 'text')
+        assert hasattr(result[0], 'metadata')
 

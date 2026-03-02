@@ -17,6 +17,7 @@ else:
     raise ImportError(f"Could not find src directory at {src_path}")
 
 from ingestion.processing.chunking.text_chunker import TextChunker
+from ingestion.processing.chunking.dto import BaseChunkDTO
 
 
 class TestTextChunker:
@@ -28,19 +29,16 @@ class TestTextChunker:
         
         assert chunker.chunk_size == 2000
         assert chunker.overlap == 0
-        assert chunker.detect_chapters is True
     
     def test_init_custom(self):
         """Test TextChunker initialization with custom parameters"""
         chunker = TextChunker(
             chunk_size=1000,
-            overlap=100,
-            detect_chapters=False
+            overlap=100
         )
         
         assert chunker.chunk_size == 1000
         assert chunker.overlap == 100
-        assert chunker.detect_chapters is False
     
     def test_chunk_empty_list(self):
         """Test chunk with empty list"""
@@ -48,9 +46,6 @@ class TestTextChunker:
         
         result = chunker.chunk(texts=[])
         assert result == []
-        
-        result = chunker.chunk(texts=[], return_metadata=True)
-        assert result == ([], [])
     
     def test_chunk_single_short_text(self):
         """Test chunk with single short text"""
@@ -61,7 +56,8 @@ class TestTextChunker:
         
         assert isinstance(result, list)
         assert len(result) == 1
-        assert result[0] == texts[0]
+        assert isinstance(result[0], BaseChunkDTO)
+        assert result[0].text == texts[0]
     
     def test_chunk_single_long_text(self):
         """Test chunk with single long text that needs splitting"""
@@ -73,8 +69,9 @@ class TestTextChunker:
         assert isinstance(result, list)
         assert len(result) > 1
         # Verify all chunks are within size limit
-        for chunk in result:
-            assert len(chunk) <= chunker.chunk_size + 10  # Allow some margin for word boundaries
+        for dto in result:
+            assert isinstance(dto, BaseChunkDTO)
+            assert len(dto.text) <= chunker.chunk_size + 10  # Allow some margin for word boundaries
     
     def test_chunk_multiple_texts(self):
         """Test chunk with multiple texts"""
@@ -90,7 +87,7 @@ class TestTextChunker:
         assert isinstance(result, list)
         assert len(result) >= 1
         # All texts should be included
-        combined = " ".join(result)
+        combined = " ".join(dto.text for dto in result)
         assert "First page" in combined
         assert "Second page" in combined
         assert "Third page" in combined
@@ -107,8 +104,8 @@ class TestTextChunker:
         
         # Check that chunks overlap (last part of one chunk appears in next)
         for i in range(len(result) - 1):
-            current_chunk = result[i]
-            next_chunk = result[i + 1]
+            current_chunk = result[i].text
+            next_chunk = result[i + 1].text
             # There should be some overlap (at least a few characters)
             overlap_found = False
             for j in range(min(len(current_chunk), len(next_chunk))):
@@ -130,8 +127,8 @@ class TestTextChunker:
         
         # Verify that overlap is applied (chunks should share some text)
         for i in range(len(result) - 1):
-            current_chunk = result[i]
-            next_chunk = result[i + 1]
+            current_chunk = result[i].text
+            next_chunk = result[i + 1].text
             # Get last words of current chunk
             current_words = current_chunk.split()[-3:]
             # Get first words of next chunk
@@ -142,7 +139,7 @@ class TestTextChunker:
             assert len(common_words) > 0 or len(current_chunk) > 0
     
     def test_chunk_with_metadata(self):
-        """Test chunk with return_metadata=True"""
+        """Test chunk returns DTOs with metadata"""
         chunker = TextChunker(chunk_size=50)
         texts = [
             "First page content.",
@@ -150,7 +147,12 @@ class TestTextChunker:
             "Third page content."
         ]
         
-        chunks, metadata_list = chunker.chunk(texts=texts, return_metadata=True)
+        result = chunker.chunk(texts=texts)
+        chunks = [dto.text for dto in result]
+        metadata_list = [
+            {"pages": dto.metadata.pages, "chapters": dto.metadata.chapters}
+            for dto in result
+        ]
         
         assert isinstance(chunks, list)
         assert isinstance(metadata_list, list)
@@ -164,17 +166,21 @@ class TestTextChunker:
             assert len(metadata['pages']) > 0
             assert 'chapters' in metadata
     
-    def test_chunk_detect_chapters_enabled(self):
-        """Test chunk with chapter detection enabled"""
-        chunker = TextChunker(chunk_size=100, detect_chapters=True)
+    def test_chunk_detect_chapters(self):
+        """Test that chapter detection is always enabled"""
+        chunker = TextChunker(chunk_size=100)
         texts = [
             "Capítulo I\nThis is the first chapter content.",
             "Capítulo II\nThis is the second chapter content."
         ]
         
-        chunks, metadata_list = chunker.chunk(texts=texts, return_metadata=True)
+        result = chunker.chunk(texts=texts)
+        metadata_list = [
+            {"pages": dto.metadata.pages, "chapters": dto.metadata.chapters}
+            for dto in result
+        ]
         
-        assert len(chunks) > 0
+        assert len(result) > 0
         # Check that chapters are detected
         chapters_found = False
         for metadata in metadata_list:
@@ -183,22 +189,7 @@ class TestTextChunker:
                 break
         # At least one chunk should have chapter information
         assert chapters_found
-    
-    def test_chunk_detect_chapters_disabled(self):
-        """Test chunk with chapter detection disabled"""
-        chunker = TextChunker(chunk_size=100, detect_chapters=False)
-        texts = [
-            "Capítulo I\nThis is the first chapter content.",
-            "Capítulo II\nThis is the second chapter content."
-        ]
-        
-        chunks, metadata_list = chunker.chunk(texts=texts, return_metadata=True)
-        
-        assert len(chunks) > 0
-        # Chapters should be empty strings when detection is disabled
-        for metadata in metadata_list:
-            assert metadata.get('chapters') == "" or metadata.get('chapters') == []
-    
+
     def test_chunk_word_boundaries(self):
         """Test that chunking respects word boundaries"""
         chunker = TextChunker(chunk_size=20)
@@ -208,7 +199,8 @@ class TestTextChunker:
         
         assert isinstance(result, list)
         # Verify no chunks end or start in the middle of words
-        for chunk in result:
+        for dto in result:
+            chunk = dto.text
             # Chunk should not start with a space (unless it's the first character)
             if len(chunk) > 0:
                 # Check that words are complete (simplified check)

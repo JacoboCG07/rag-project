@@ -18,7 +18,6 @@ class ChunkingFactory:
     """
 
     _registry: Dict[str, Type[BaseChunker]] = {
-        "characters": TextChunker,
         "default": TextChunker,
     }
 
@@ -29,7 +28,6 @@ class ChunkingFactory:
         strategy: str = "default",
         chunk_size: int = 2000,
         overlap: int = 0,
-        detect_chapters: bool = True,
         **kwargs
     ) -> BaseChunker:
         """
@@ -39,7 +37,6 @@ class ChunkingFactory:
             strategy: Chunking strategy name ('characters', 'default').
             chunk_size: Maximum size of each chunk (default 2000).
             overlap: Number of characters to overlap between chunks (default 0).
-            detect_chapters: Whether to detect chapters in text (default True).
             **kwargs: Additional parameters for specific chunker implementations.
 
         Returns:
@@ -73,7 +70,6 @@ class ChunkingFactory:
                 "chunker_class": chunker_cls.__name__,
                 "chunk_size": chunk_size,
                 "overlap": overlap,
-                "detect_chapters": detect_chapters
             }
         )
 
@@ -82,7 +78,6 @@ class ChunkingFactory:
             return chunker_cls(
                 chunk_size=chunk_size,
                 overlap=overlap,
-                detect_chapters=detect_chapters,
                 **kwargs
             )
         else:

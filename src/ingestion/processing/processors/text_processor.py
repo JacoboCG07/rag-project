@@ -19,7 +19,6 @@ class TextProcessor:
         *,
         chunk_size: int = 2000,
         chunk_overlap: int = 0,
-        detect_chapters: bool = True,
     ):
         """
         Initializes the text processor.
@@ -27,14 +26,12 @@ class TextProcessor:
         Args:
             chunk_size: Maximum size of each chunk in characters.
             chunk_overlap: Number of characters to overlap between chunks.
-            detect_chapters: Whether to detect chapters in text.
         """
         self.logger = get_logger(__name__)
         self.chunker = ChunkingFactory.create_chunker(
             strategy="default",
             chunk_size=chunk_size,
             overlap=chunk_overlap,
-            detect_chapters=detect_chapters,
         )
 
         self.logger.info(
@@ -42,7 +39,6 @@ class TextProcessor:
             extra={
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
-                "detect_chapters": detect_chapters,
             },
         )
 
@@ -67,12 +63,15 @@ class TextProcessor:
                 "pages_count": len(pages),
                 "chunk_size": self.chunker.chunk_size,
                 "chunk_overlap": self.chunker.overlap,
-                "detect_chapters": self.chunker.detect_chapters,
             },
         )
 
-        # Chunk pages with metadata
-        chunks, metadata_list = self.chunker.chunk(texts=pages, return_metadata=True)
+        dto_list = self.chunker.chunk(texts=pages)
+        chunks = [dto.text for dto in dto_list]
+        metadata_list = [
+            {"pages": dto.metadata.pages, "chapters": dto.metadata.chapters}
+            for dto in dto_list
+        ]
 
         self.logger.info(
             "Text processing completed",

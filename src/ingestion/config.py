@@ -40,7 +40,6 @@ class IngestionPipelineConfig(BaseModel):
     # Chunking configuration
     chunk_size: int = Field(default=2000, ge=100, le=10_000, description="Maximum size of each chunk in characters")
     chunk_overlap: int = Field(default=0, ge=10, le=1000, description="Number of characters to overlap between chunks")
-    detect_chapters: bool = Field(default=True, description="Whether to detect chapters in documents")
     
     # Embedding configuration
     embedder: OpenAIEmbedder = Field(default_factory=lambda: OpenAIEmbedder(model="text-embedding-ada-002", count_tokens=False))

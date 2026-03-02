@@ -64,8 +64,7 @@ class IngestionPipeline:
                 host=config.milvus.host,
                 port=config.milvus.port,
                 chunk_size=config.chunk_size,
-                chunk_overlap=config.chunk_overlap,
-                detect_chapters=config.detect_chapters
+                chunk_overlap=config.chunk_overlap
             )
             self.logger.info("Ingestion Pipeline initialized successfully")
         except Exception as e:

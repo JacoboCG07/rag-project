@@ -9,6 +9,7 @@ from src.utils import get_logger
 
 from ...types import ExtractionResult
 from ..milvus.milvus_client import MilvusClient
+from ..preparers.summary_preparer import SummaryPreparer
 
 class SummaryUploader:
     """
@@ -82,10 +83,11 @@ class SummaryUploader:
                 self.logger.error("content must be a non-empty list of texts")
                 raise ValueError("content must be a non-empty list of texts")
 
-            # Get file_name and file_type from metadata
+            # Get file_name, file_type and has_chapters from metadata
             file_name = metadata_obj.file_name
             file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
-            
+            has_chapters = bool(getattr(metadata_obj, 'chapters', False))
+
             num_images = len(images) if images else 0
 
             self.logger.debug(
@@ -115,7 +117,7 @@ class SummaryUploader:
                 file_type=file_type,
                 file_name=file_name,
                 num_pages=len(content),
-                chapters=chapters,
+                has_chapters=has_chapters,
                 num_images=num_images,
                 partition_name=partition_name,
             )
@@ -207,7 +209,7 @@ class SummaryUploader:
         file_type: str,
         file_name: str,
         num_pages: int,
-        chapters: bool,
+        has_chapters: bool,
         num_images: int,
         partition_name: str,
     ) -> None:
@@ -220,6 +222,7 @@ class SummaryUploader:
             file_type: File type.
             file_name: File name.
             num_pages: Number of pages in the document.
+            has_chapters: Whether the document has chapters detected.
             num_images: Number of images in the document.
             partition_name: Partition name.
         """
@@ -236,56 +239,24 @@ class SummaryUploader:
         if isinstance(embedding, tuple):
             # If it returns (embedding, token_count), extract just the embedding
             embedding, _ = embedding
-        embeddings = [embedding]
 
-        # Prepare metadata for summary
-        metadata_summary = self._prepare_metadata(
-            file_id=file_id,
-            file_type=f"summary_{file_type}",
-            file_name=f"summary_{file_name}",
-            num_pages=num_pages,
-            chapters=chapters,
-            num_images=num_images,
-        )
-
-        # Insert summary into summaries collection
-        self.milvus_client.insert_documents(
-            texts=[cleaned_summary],
-            embeddings=embeddings,
-            metadata=metadata_summary,
-            partition_name=partition_name
-        )
-
-    @staticmethod
-    def _prepare_metadata(
-        *,
-        file_id: str,
-        file_type: str,
-        file_name: str,
-        num_pages: int,
-        chapters: bool,
-        num_images: int,
-    ) -> Dict[str, Any]:
-        """
-        Prepares metadata for insertion into Milvus.
-
-        Args:
-            file_id: File ID.
-            file_name: File name.
-            source_id: Source ID.
-            file_type: File type.
-            num_pages: Number of pages.
-            num_images: Number of images.
-            pages: List of page numbers.
-
-        Returns:
-            Dict: Prepared metadata.
-        """
-        return {
+        # Prepare summary via SummaryPreparer
+        metadata = {
             "file_id": file_id,
-            "file_type": file_type,
-            "file_name": file_name,
-            "full_pages": str(num_pages),
-            "chapters": str(chapters),
-            "full_images": str(num_images),
+            "file_type": f"summary_{file_type}",
+            "file_name": f"summary_{file_name}",
+            "full_pages": num_pages,
+            "chapters": "true" if has_chapters else "false",
+            "full_images": num_images,
         }
+        prepared_dict = SummaryPreparer.prepare(
+            summary=cleaned_summary,
+            embedding=embedding,
+            metadata=metadata,
+        )
+
+        # Insert summary via insert_prepared_data
+        self.milvus_client.insert_prepared_data(
+            prepared_data=[prepared_dict],
+            partition_name=partition_name,
+        )

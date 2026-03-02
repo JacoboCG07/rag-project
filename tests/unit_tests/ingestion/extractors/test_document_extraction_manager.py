@@ -11,7 +11,7 @@ import fitz  # PyMuPDF
 
 # Add src to path
 # Calculate project root: go up from test file to project root
-# test_folder_reader.py -> folder_reader/ -> ingestion/ -> unit_tests/ -> tests/ -> project_root
+# test_document_extraction_manager.py -> extractors/ -> ingestion/ -> unit_tests/ -> tests/ -> project_root
 _current_file = Path(__file__).resolve()
 project_root = _current_file.parent.parent.parent.parent.parent
 src_path = project_root / "src"
@@ -312,4 +312,3 @@ class TestDocumentExtractionManager:
             assert isinstance(result.metadata.file_name, str)
             # Verify file_name is not empty
             assert len(result.metadata.file_name) > 0
-

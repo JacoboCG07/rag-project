@@ -1,16 +1,14 @@
 """
 Manages extraction of information from one or multiple documents using extractors
 """
-from pathlib import Path
-from typing import List, Dict, Optional
+
 import inspect
-from concurrent.futures import ProcessPoolExecutor, as_completed
-
+from pathlib import Path
 from src.utils import get_logger
-
-from ..types import ExtractionResult, BaseFileMetadata
+from typing import List, Dict, Optional
 from .factory import DocumentExtractorFactory
-
+from ..types import ExtractionResult, BaseFileMetadata
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 class DocumentExtractionManager:
     """Manages extraction of information from one or multiple documents using extractors"""

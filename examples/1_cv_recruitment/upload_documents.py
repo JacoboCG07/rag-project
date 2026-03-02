@@ -32,6 +32,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "example_1"
 
 def upload_documents():
     """Sube e indexa todos los documentos del ejemplo en Milvus"""
@@ -46,10 +47,10 @@ def upload_documents():
     # Lista de documentos a procesar
     expected_files = [
         "job_proposal.pdf",
-        "cv_candidate_1.pdf",
-        "cv_candidate_2.pdf",
-        "cv_candidate_3.pdf",
-        "cv_candidate_4.pdf"
+        # "cv_candidate_1.pdf",
+        # "cv_candidate_2.pdf",
+        # "cv_candidate_3.pdf",
+        # "cv_candidate_4.pdf",
     ]
     
     # Obtener rutas de los archivos
@@ -63,8 +64,12 @@ def upload_documents():
     
     try:
         # Configurar el RAG Pipeline
-        # Nota: Ajusta la configuración según tus necesidades
-        config = IngestionPipelineConfig(collection_name=collection_name)
+        # Opciones: chunk_size, chunk_overlap, extract_images
+        config = IngestionPipelineConfig(
+            collection_name=collection_name,
+            chunk_size=2000,
+            extract_images=False,
+        )
         
         with IngestionPipeline(config=config) as pipeline:
             successful = 0
@@ -83,7 +88,8 @@ def upload_documents():
                     # Los documentos van a la partición 'documents' y los resúmenes a 'summaries'
                     success, message, result_info = pipeline.process_single_file(
                         file_path=str(file_path),
-                        extract_process_images=False
+                        extract_process_images=False,
+                        job_id=JOB_ID
                     )
                     
                     if success:
