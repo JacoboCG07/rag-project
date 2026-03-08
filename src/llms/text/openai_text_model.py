@@ -184,6 +184,19 @@ class OpenAITextModel(BaseTextModel):
 
             return result.strip()
 
+        except KeyError as e:
+            # KeyError('error') ocurre cuando el cliente OpenAI no puede parsear la respuesta de error de la API
+            # (p. ej. respuesta con estructura inesperada). Ver: https://github.com/openai/openai-python/issues
+            self.logger.error(
+                f"Error parseando respuesta de OpenAI (KeyError): {e}. "
+                "Posibles causas: API key inválida, límite de uso excedido, error de red.",
+                extra={"model": self.model, "error_type": "KeyError"},
+                exc_info=True
+            )
+            raise Exception(
+                f"La API de OpenAI devolvió una respuesta de error que no pudo parsearse. "
+                f"Verifica tu API key (OPENAI_API_KEY), límites de uso y conectividad. Error: {e}"
+            ) from e
         except Exception as e:
             error_msg = str(e)
             # Check for rate limit errors

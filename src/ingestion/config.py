@@ -52,6 +52,12 @@ class IngestionPipelineConfig(BaseModel):
     
     # Processing options
     extract_images: bool = Field(default=False, description="Whether to extract and process images from PDFs")
+    max_images_per_document: int = Field(
+        default=100,
+        ge=1,
+        le=10000,
+        description="Maximum number of images allowed per document. Documents exceeding this limit will fail with an error."
+    )
 
     # Image description configuration
     vision_model: OpenAIVisionModel = Field(default_factory=lambda: OpenAIVisionModel(model="gpt-4o"))
@@ -85,7 +91,8 @@ class IngestionPipelineConfig(BaseModel):
                 "chunk_size": self.chunk_size,
                 "chunk_overlap": self.chunk_overlap,
                 "has_summarizer": self.summarizer is not None,
-                "has_image_describer": self.image_describer is not None
+                "has_image_describer": self.image_describer is not None,
+                "max_images_per_document": self.max_images_per_document
             }
         )
         

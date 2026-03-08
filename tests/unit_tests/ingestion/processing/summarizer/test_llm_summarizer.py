@@ -78,6 +78,7 @@ class TestLLMSummarizer:
         summarizer_default = LLMSummarizer(text_model=mock_text_model)
         assert summarizer_default.max_tokens == 1_000
         assert summarizer_default.temperature == 0.3
+        assert summarizer_default.max_input_chars == 100_000
     
     def test_init_with_invalid_text_model_raises_error(self, mock_prompt_loader):
         """Test that initialization with invalid text_model raises ValueError"""
@@ -120,6 +121,36 @@ class TestLLMSummarizer:
         assert "Error generating summary" in str(exc_info.value)
         assert "API error" in str(exc_info.value)
     
+    def test_generate_summary_truncates_long_text(self, mock_text_model, mock_prompt_loader, caplog):
+        """Test that text exceeding max_input_chars is truncated with warning"""
+        summarizer = LLMSummarizer(
+            text_model=mock_text_model,
+            max_input_chars=50
+        )
+        long_text = "A" * 100 + ". Segunda oración."
+
+        result = summarizer.generate_summary(long_text)
+
+        assert result == "Mock summary response"
+        assert mock_text_model.call_count == 1
+        prompt_sent = mock_text_model.last_prompt
+        assert "Texto recortado" in prompt_sent or "recortado" in prompt_sent.lower()
+        assert len(prompt_sent) <= 50 + 100  # truncated content + suffix
+        assert "Texto muy largo" in caplog.text or "Truncando" in caplog.text
+
+    def test_generate_summary_short_text_not_truncated(self, mock_text_model, mock_prompt_loader):
+        """Test that text under max_input_chars is passed unchanged"""
+        summarizer = LLMSummarizer(
+            text_model=mock_text_model,
+            max_input_chars=1000
+        )
+        short_text = "Texto corto para resumir."
+
+        result = summarizer.generate_summary(short_text)
+
+        assert mock_text_model.last_prompt == short_text
+        assert "Texto recortado" not in (mock_text_model.last_prompt or "")
+
     def test_get_summary_prompt(self, mock_prompt_loader):
         """Test that _get_summary_prompt loads the correct template"""
         text = "Test text"

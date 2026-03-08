@@ -9,6 +9,42 @@ from src.llms.text import BaseTextModel, OpenAITextModel
 from src.utils.utils import PromptLoader
 from src.utils import get_logger
 
+_TRUNCATION_SUFFIX = (
+    "\n\n[... Texto recortado: el documento excedía el límite de caracteres. "
+    "El resumen se basa en la primera parte.]"
+)
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    """
+    Trunca el texto a max_chars caracteres, intentando cortar en límite de
+    párrafo o palabra. Añade sufijo indicando el recorte.
+    """
+    max_content = max_chars - len(_TRUNCATION_SUFFIX)
+    if len(text) <= max_content:
+        return text
+
+    # Buscar último punto o doble salto en los últimos 500 caracteres
+    search_start = max(0, max_content - 500)
+    search_region = text[search_start:max_content]
+    cut_idx = -1
+    for sep in (". ", "\n\n"):
+        pos = search_region.rfind(sep)
+        if pos != -1:
+            cut_idx = search_start + pos + len(sep)
+            break
+
+    if cut_idx > 0:
+        truncated = text[:cut_idx].rstrip()
+    else:
+        # Cortar en último espacio antes del límite
+        truncated = text[:max_content].rstrip()
+        last_space = truncated.rfind(" ")
+        if last_space > max_content // 2:
+            truncated = truncated[:last_space]
+
+    return truncated + _TRUNCATION_SUFFIX
+
 
 class LLMSummarizer:
     """
@@ -21,7 +57,8 @@ class LLMSummarizer:
         *,
         text_model: Optional[BaseTextModel] = None,
         max_tokens: int = 1_000,
-        temperature: float = 0.3
+        temperature: float = 0.3,
+        max_input_chars: int = 100_000
     ):
         """
         Initializes the LLM summarizer.
@@ -30,6 +67,7 @@ class LLMSummarizer:
             text_model: BaseTextModel instance to use. Must be provided.
             max_tokens: Maximum tokens for the summary (default 1000).
             temperature: Temperature for generation (default 0.3, lower for more focused summaries).
+            max_input_chars: Maximum characters of input text (default 100000). Longer text is truncated with a warning.
 
         Raises:
             ValueError: If text_model is not provided or is not an instance of BaseTextModel.
@@ -44,6 +82,7 @@ class LLMSummarizer:
         self.text_model: BaseTextModel = text_model
         self.max_tokens: int = max_tokens
         self.temperature: float = temperature
+        self.max_input_chars: int = max_input_chars
         self.logger = get_logger(__name__)
         
         self.logger.info(
@@ -51,6 +90,7 @@ class LLMSummarizer:
             extra={
                 "max_tokens": max_tokens,
                 "temperature": temperature,
+                "max_input_chars": max_input_chars,
                 "text_model_type": type(text_model).__name__
             }
         )
@@ -78,6 +118,18 @@ class LLMSummarizer:
             self.logger.error("Text cannot be empty after stripping")
             raise ValueError("Text cannot be empty after stripping")
 
+        original_len = len(text)
+        if original_len > self.max_input_chars:
+            self.logger.warning(
+                f"Texto muy largo ({original_len} caracteres). Truncando a {self.max_input_chars} caracteres "
+                "para evitar exceder el límite del modelo. El resumen se basará en la primera parte del documento.",
+                extra={
+                    "original_length": original_len,
+                    "max_input_chars": self.max_input_chars
+                }
+            )
+            text = _truncate_text(text, self.max_input_chars)
+
         self.logger.debug(
             "Starting summary generation",
             extra={
@@ -102,22 +154,28 @@ class LLMSummarizer:
             self.logger.info(
                 "Summary generated successfully",
                 extra={
-                    "original_text_length": len(text),
+                    "original_text_length": original_len,
                     "summary_length": len(summary.strip())
                 }
             )
             
             return summary.strip()
         except Exception as e:
+            error_detail = str(e)
+            if isinstance(e, KeyError) or error_detail == "'error'":
+                error_detail = (
+                    f"{error_detail} — Posible error de la API de OpenAI al parsear la respuesta. "
+                    "Verifica OPENAI_API_KEY, límites de uso y conectividad."
+                )
             self.logger.error(
-                f"Error generating summary: {str(e)}",
+                f"Error generating summary: {error_detail}",
                 extra={
-                    "text_length": len(text),
+                    "text_length": original_len,
                     "error_type": type(e).__name__
                 },
                 exc_info=True
             )
-            raise Exception(f"Error generating summary: {str(e)}") from e
+            raise Exception(f"Error generating summary: {error_detail}") from e
 
     @staticmethod
     def _get_summary_prompt(text: str) -> str:

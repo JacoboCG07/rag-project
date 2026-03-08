@@ -172,9 +172,16 @@ class SummaryUploader:
             extra={"content_chunks": len(content)}
         )
         
-        # Combine all content into a single text
+        # Limitar a las primeras 10 páginas para el resumen
+        pages_to_summarize = content[:10]
+        if len(content) > 10:
+            self.logger.info(
+                "Limiting summary to first 10 pages",
+                extra={"total_pages": len(content), "pages_used": 10}
+            )
+        
         full_text = "\n\n".join([
-            text.strip() for text in content 
+            text.strip() for text in pages_to_summarize
             if text and isinstance(text, str)
         ])
         

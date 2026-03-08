@@ -47,10 +47,10 @@ def upload_documents():
     # Lista de documentos a procesar
     expected_files = [
         "job_proposal.pdf",
-        # "cv_candidate_1.pdf",
-        # "cv_candidate_2.pdf",
-        # "cv_candidate_3.pdf",
-        # "cv_candidate_4.pdf",
+        "cv_candidate_1.pdf",
+        "cv_candidate_2.pdf",
+        "cv_candidate_3.pdf",
+        "cv_candidate_4.pdf",
     ]
     
     # Obtener rutas de los archivos

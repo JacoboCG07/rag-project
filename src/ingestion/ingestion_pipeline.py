@@ -2,16 +2,16 @@
 Ingestion Pipeline
 Integrates DocumentExtractionManager with DocumentProcessor for end-to-end document processing
 """
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+
 import hashlib
-
-from .types import ExtractionResult, BaseFileMetadata
-from .extractors import DocumentExtractionManager
-from .processing.document_processor import DocumentProcessor
+from pathlib import Path
 from .config import IngestionPipelineConfig
-from src.utils import get_logger
-
+from src.utils import get_logger, set_job_id
+from typing import Dict, Any, Optional, Tuple
+from .extractors import DocumentExtractionManager
+from .pipeline_logger import IngestionPipelineLogger
+from .types import ExtractionResult, BaseFileMetadata
+from .processing.document_processor import DocumentProcessor
 
 class IngestionPipeline:
     """
@@ -34,6 +34,7 @@ class IngestionPipeline:
         """
         self.logger = get_logger(__name__)
         self.config = config
+        self.pipeline_logger = IngestionPipelineLogger(self.logger, config.collection_name)
         
         self.logger.info(
             "Initializing Ingestion Pipeline",
@@ -45,7 +46,8 @@ class IngestionPipeline:
                 "milvus_port": config.milvus.port or "default",
                 "chunk_size": config.chunk_size,
                 "chunk_overlap": config.chunk_overlap,
-                "extract_images": config.extract_images
+                "extract_images": config.extract_images,
+                "max_images_per_document": config.max_images_per_document
             }
         )
         
@@ -100,13 +102,20 @@ class IngestionPipeline:
             Tuple[bool, str, Dict]: (success, message, result_info).
             result_info contains: file_id, file_name, file_path.
         """
-        # Bind job_id al logger para que aparezca en todos los logs
-        if job_id: self.logger = self.logger.bind(job_id=job_id)
-        
+        # Propagate job_id: bind to logger and contextvar (so all subcomponent logs include it in MongoDB)
+        if job_id:
+            self.logger = self.logger.bind(job_id=job_id)
+            self.pipeline_logger.logger = self.logger
+            set_job_id(job_id)
+
+        # Use config.extract_images as fallback when not explicitly specified
+        if extract_process_images is None:
+            extract_process_images = self.config.extract_images
+
         file_path_obj = Path(file_path)
         file_id = self._generate_file_id(file_path)
-        self._log_file_processing_start(file_path_obj, file_id, extract_process_images)
-        
+        self.pipeline_logger.file_processing_start(file_path_obj, file_id, extract_process_images)
+
         try:
             # Initialize and extract content from DocumentExtractionManager with parent folder
             extraction_manager = DocumentExtractionManager(folder_path=str(file_path_obj.parent))
@@ -114,10 +123,15 @@ class IngestionPipeline:
                 file_path=file_path_obj,
                 extract_images=extract_process_images
             )
-            file_name = self._log_extracted_content(document_data, file_id)
+            file_name = self.pipeline_logger.extracted_content(document_data, file_id)
+
+            limit_exceeded, error_message, result_info = self._check_max_images_limit(
+                extract_process_images, document_data, file_id, file_name, file_path_obj
+            )
+            if limit_exceeded: return False, error_message, result_info
 
             # Process and insert document in milvus
-            self._log_milvus_processing_start_debug(file_id, file_name)
+            self.pipeline_logger.milvus_processing_start_debug(file_id, file_name)
             success, message = self.document_processor.process_and_insert(
                 file_id=file_id,
                 document_data=document_data,
@@ -131,11 +145,11 @@ class IngestionPipeline:
                 "file_path": str(file_path_obj)
             }
             
-            if success: self._log_file_processed_successfully(file_id, file_name, message)
-            else: self._log_file_processing_error(file_id, file_name, message)
-            
+            if success: self.pipeline_logger.file_processed_successfully(file_id, file_name, message)
+            else: self.pipeline_logger.file_processing_error(file_id, file_name, message)
+
             return success, message, result_info
-            
+
         except Exception as e:
             self.logger.error(
                 f"Exception processing file: {str(e)}",
@@ -154,7 +168,44 @@ class IngestionPipeline:
                 "file_path": str(file_path_obj)
             }
             return False, f"Error processing file: {str(e)}", result_info
+        finally:
+            # Clear contextvar to avoid contaminating logs from other operations
+            if job_id:
+                set_job_id(None)
 
+
+    def _check_max_images_limit(
+        self,
+        extract_process_images: bool,
+        document_data: ExtractionResult[BaseFileMetadata],
+        file_id: str,
+        file_name: str,
+        file_path_obj: Path,
+    ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Checks if document exceeds max images per document limit.
+
+        Returns:
+            Tuple of (limit_exceeded, error_message, result_info).
+            When limit exceeded: (True, error_message, result_info).
+            When ok: (False, None, None).
+        """
+        if not extract_process_images or document_data.images is None:
+            return False, None, None
+        if len(document_data.images) <= self.config.max_images_per_document:
+            return False, None, None
+        image_count = len(document_data.images)
+        limit = self.config.max_images_per_document
+        error_message = (
+            f"Document has too many images ({image_count}), maximum allowed is {limit}"
+        )
+        self.pipeline_logger.file_processing_error(file_id, file_name, error_message)
+        result_info = {
+            "file_id": file_id,
+            "file_name": document_data.metadata.file_name,
+            "file_path": str(file_path_obj)
+        }
+        return True, error_message, result_info
 
     @staticmethod
     def _generate_file_id(file_path: str) -> str:
@@ -171,129 +222,6 @@ class IngestionPipeline:
         normalized_path = str(Path(file_path).resolve())
         file_hash = hashlib.md5(normalized_path.encode()).hexdigest()
         return file_hash
-
-    def _log_file_processing_start(
-        self,
-        file_path_obj: Path,
-        file_id: str,
-        extract_process_images: Optional[bool]
-    ) -> None:
-        """
-        Logs information when starting file processing.
-
-        Args:
-            file_path_obj: Path object of the file being processed.
-            file_id: File identifier.
-            extract_process_images: Whether to extract images from PDFs.
-        """
-        self.logger.info(
-            "Starting file processing",
-            extra={
-                "file_path": str(file_path_obj),
-                "file_id": file_id,
-                "collection_name": self.config.collection_name,
-                "extract_process_images": extract_process_images
-            }
-        )
-
-    def _log_extracted_content(
-        self,
-        document_data: ExtractionResult[BaseFileMetadata],
-        file_id: str
-    ) -> str:
-        """
-        Logs information about extracted file content.
-
-        Args:
-            document_data: ExtractionResult containing the extracted document data.
-            file_id: File identifier.
-
-        Returns:
-            str: File name from document metadata.
-        """
-        file_name = document_data.metadata.file_name
-        content = len(document_data.content)
-        images_count = len(document_data.images) if document_data.images else 0
-        
-        self.logger.info(
-            "File content extracted",
-            extra={
-                "file_id": file_id,
-                "file_name": file_name,
-                "content": content,
-                "images_count": images_count
-            }
-        )
-        return file_name
-
-    def _log_milvus_processing_start_debug(
-        self,
-        file_id: str,
-        file_name: str
-    ) -> None:
-        """
-        Logs debug information before processing and inserting document into Milvus.
-
-        Args:
-            file_id: File identifier.
-            file_name: Name of the file being processed.
-        """
-        self.logger.debug(
-            "Processing and inserting document into Milvus",
-            extra={
-                "file_id": file_id,
-                "file_name": file_name,
-                "collection_name": self.config.collection_name
-            }
-        )
-
-    def _log_file_processed_successfully(
-        self,
-        file_id: str,
-        file_name: str,
-        message: str
-    ) -> None:
-        """
-        Logs information when a file is processed successfully.
-
-        Args:
-            file_id: File identifier.
-            file_name: Name of the file that was processed.
-            message: Success message from the processing operation.
-        """
-        self.logger.info(
-            "File processed successfully",
-            extra={
-                "file_id": file_id,
-                "file_name": file_name,
-                "collection_name": self.config.collection_name,
-                "message": message
-            }
-        )
-
-    def _log_file_processing_error(
-        self,
-        file_id: str,
-        file_name: str,
-        error_message: str
-    ) -> None:
-        """
-        Logs error information when file processing fails.
-
-        Args:
-            file_id: File identifier.
-            file_name: Name of the file that failed to process.
-            error_message: Error message from the processing operation.
-        """
-        self.logger.error(
-            "Error processing file",
-            extra={
-                "file_id": file_id,
-                "file_name": file_name,
-                "collection_name": self.config.collection_name,
-                "error_message": error_message
-            }
-        )
 
     def close(self) -> None:
         """Closes connections with Milvus."""

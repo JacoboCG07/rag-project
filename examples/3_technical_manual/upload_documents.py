@@ -8,9 +8,14 @@ Documento a subir:
 - manual.pdf
 """
 
-import os
 import sys
 from pathlib import Path
+
+# Configurar codificación UTF-8 para Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Añadir el directorio raíz al path para imports
 root_dir = Path(__file__).parent.parent.parent
@@ -22,6 +27,9 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "example_4"
+EXTRACT_IMAGES = True
+MAX_IMAGES_PER_DOCUMENT = 100
 
 def upload_documents():
     """Sube e indexa el manual técnico en Milvus"""
@@ -32,48 +40,61 @@ def upload_documents():
     
     # Ruta a la carpeta de datos
     data_dir = Path(__file__).parent / "data"
-    manual_file = data_dir / "manual.pdf"
+    manual_file = data_dir / "social_media_report.pdf"
     
     # Verificar que existe el archivo
-    print("\n📋 Verificando archivo...")
-    
     if not manual_file.exists():
-        print(f"  ✗ manual.pdf - NO ENCONTRADO")
+        print(f"\n✗ {manual_file.name} - NO ENCONTRADO")
         print("\n❌ No se encontró el archivo 'manual.pdf'")
         print("   Por favor, añade el manual a la carpeta 'data/'")
         return
     
-    print(f"  ✓ manual.pdf")
-    print(f"\n🚀 Procesando manual técnico...\n")
+    print(f"\n🚀 Procesando 1 documento...\n")
+    
+    collection_name = "technical_manual"
     
     try:
-        # Configurar el RAG Pipeline
-        # Nota: Ajusta la configuración según tus necesidades
-        config = IngestionPipelineConfig()
+        config = IngestionPipelineConfig(
+            collection_name=collection_name,
+            chunk_size=2000,
+            extract_images=EXTRACT_IMAGES,
+            max_images_per_document=MAX_IMAGES_PER_DOCUMENT,
+        )
         
         with IngestionPipeline(config=config) as pipeline:
             print(f"{'─' * 80}")
-            print(f"Procesando: {manual_file.name}")
+            print(f"[1/1] Procesando: {manual_file.name}")
+            print(f"Colección: {collection_name}")
+            print(f"  - Partición documentos: documents")
+            print(f"  - Partición resúmenes: summaries")
             print('─' * 80)
             
-            # Procesar e indexar el documento
-            result = pipeline.process_document(str(manual_file))
+            success, message, result_info = pipeline.process_single_file(
+                file_path=str(manual_file),
+                job_id=JOB_ID
+            )
             
-            print(f"\n✓ {manual_file.name} procesado correctamente")
-            if result:
-                print(f"  - Chunks generados: {result.get('chunks_count', 'N/A')}")
-                print(f"  - File ID: {result.get('file_id', 'N/A')}")
-                print(f"  - Páginas totales: {result.get('total_pages', 'N/A')}")
-            
-            print("\n" + "=" * 80)
-            print("✅ MANUAL INDEXADO CORRECTAMENTE")
-            print("=" * 80)
-            print("\nEl manual está listo para búsqueda simple.")
-            print("Ejecuta 'python run_example.py' para probar búsquedas directas.")
+            if success:
+                print(f"\n✓ {manual_file.name} procesado correctamente")
+                print(f"  - File ID: {result_info.get('file_id', 'N/A')}")
+                print(f"  - Mensaje: {message}")
+                print("\n" + "=" * 80)
+                print("RESUMEN DE SUBIDA")
+                print("=" * 80)
+                print(f"✓ Exitosos: 1")
+                print(f"✗ Fallidos: 0")
+                print(f"📊 Total procesados: 1")
+                print("\n✅ El manual está listo para búsqueda.")
+                print(f"   Colección utilizada: {collection_name}")
+                print(f"   - Partición documentos: documents")
+                print(f"   - Partición resúmenes: summaries")
+                print("   Ejecuta 'python run_example.py' para probar búsquedas directas.")
+            else:
+                print(f"\n✗ Error procesando {manual_file.name}: {message}")
             
     except Exception as e:
         logger.error(f"Error procesando el manual: {str(e)}", exc_info=True)
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\n❌ Error crítico: {str(e)}")
         print("\nAsegúrate de que:")
         print("  1. Milvus está corriendo (docker-compose up -d)")
         print("  2. Las variables de entorno están configuradas (.env)")
@@ -85,20 +106,11 @@ def main():
     
     print("\n📤 Iniciando subida de documento para Ejemplo 3: Manual Técnico...\n")
     
-    # Verificar que Milvus está disponible
     print("ℹ️  Asegúrate de que Milvus está corriendo:")
     print("   docker-compose up -d\n")
-    
-    response = input("¿Milvus está corriendo? (s/n): ")
-    if response.lower() != 's':
-        print("\nPor favor, inicia Milvus primero:")
-        print("  cd ../../  # Ir a la raíz del proyecto")
-        print("  docker-compose up -d")
-        return
     
     upload_documents()
 
 
 if __name__ == "__main__":
     main()
-

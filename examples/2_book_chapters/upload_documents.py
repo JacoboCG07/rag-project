@@ -8,9 +8,14 @@ Documento a subir:
 - book_sample.pdf
 """
 
-import os
 import sys
 from pathlib import Path
+
+# Configurar codificación UTF-8 para Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Añadir el directorio raíz al path para imports
 root_dir = Path(__file__).parent.parent.parent
@@ -21,6 +26,8 @@ from src.ingestion.config import IngestionPipelineConfig
 from src.utils import get_logger
 
 logger = get_logger(__name__)
+
+JOB_ID = "example_2"
 
 
 def upload_documents():
@@ -35,53 +42,62 @@ def upload_documents():
     book_file = data_dir / "book_sample.pdf"
     
     # Verificar que existe el archivo
-    print("\n📋 Verificando archivo...")
-    
     if not book_file.exists():
-        print(f"  ✗ book_sample.pdf - NO ENCONTRADO")
+        print(f"\n✗ book_sample.pdf - NO ENCONTRADO")
         print("\n❌ No se encontró el archivo 'book_sample.pdf'")
         print("   Por favor, añade el libro a la carpeta 'data/'")
         return
     
-    print(f"  ✓ book_sample.pdf")
-    print(f"\n🚀 Procesando libro...\n")
+    print(f"\n🚀 Procesando 1 documento...\n")
+    
+    collection_name = "book_chapters"
     
     try:
-        # Configurar el RAG Pipeline
-        # Nota: Ajusta la configuración según tus necesidades
-        config = IngestionPipelineConfig()
+        config = IngestionPipelineConfig(
+            collection_name=collection_name,
+            chunk_size=2000,
+            extract_images=False,
+        )
         
         with IngestionPipeline(config=config) as pipeline:
             print(f"{'─' * 80}")
-            print(f"Procesando: {book_file.name}")
+            print(f"[1/1] Procesando: {book_file.name}")
+            print(f"Colección: {collection_name}")
+            print(f"  - Partición documentos: documents")
+            print(f"  - Partición resúmenes: summaries")
             print('─' * 80)
             
-            # Procesar e indexar el documento
-            result = pipeline.process_document(str(book_file))
+            success, message, result_info = pipeline.process_single_file(
+                file_path=str(book_file),
+                extract_process_images=False,
+                job_id=JOB_ID
+            )
             
-            print(f"\n✓ {book_file.name} procesado correctamente")
-            if result:
-                print(f"  - Chunks generados: {result.get('chunks_count', 'N/A')}")
-                print(f"  - File ID: {result.get('file_id', 'N/A')}")
-                print(f"  - Capítulos detectados: {result.get('chapters', 'N/A')}")
-                print(f"  - Páginas totales: {result.get('total_pages', 'N/A')}")
-            
-            print("\n" + "=" * 80)
-            print("✅ LIBRO INDEXADO CORRECTAMENTE")
-            print("=" * 80)
-            print("\nEl libro está listo para búsqueda con metadatos.")
-            print("Ejecuta 'python run_example.py' para probar búsquedas por capítulos y páginas.")
+            if success:
+                print(f"\n✓ {book_file.name} procesado correctamente")
+                print(f"  - File ID: {result_info.get('file_id', 'N/A')}")
+                print(f"  - Mensaje: {message}")
+                print("\n" + "=" * 80)
+                print("RESUMEN DE SUBIDA")
+                print("=" * 80)
+                print(f"✓ Exitosos: 1")
+                print(f"✗ Fallidos: 0")
+                print(f"📊 Total procesados: 1")
+                print("\n✅ El libro está listo para búsqueda.")
+                print(f"   Colección utilizada: {collection_name}")
+                print(f"   - Partición documentos: documents")
+                print(f"   - Partición resúmenes: summaries")
+                print("   Ejecuta 'python run_example.py' para probar búsquedas por capítulos y páginas.")
+            else:
+                print(f"\n✗ Error procesando {book_file.name}: {message}")
             
     except Exception as e:
         logger.error(f"Error procesando el libro: {str(e)}", exc_info=True)
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\n❌ Error crítico: {str(e)}")
         print("\nAsegúrate de que:")
         print("  1. Milvus está corriendo (docker-compose up -d)")
         print("  2. Las variables de entorno están configuradas (.env)")
         print("  3. Tienes una API key válida de OpenAI")
-        print("  4. El libro tiene estructura de capítulos y páginas")
-        print("\nNota: Este ejemplo requiere que el documento tenga metadatos")
-        print("      estructurados (capítulos, páginas) para funcionar correctamente.")
 
 
 def main():
@@ -89,24 +105,11 @@ def main():
     
     print("\n📤 Iniciando subida de documento para Ejemplo 2: Libro...\n")
     
-    # Verificar que Milvus está disponible
     print("ℹ️  Asegúrate de que Milvus está corriendo:")
     print("   docker-compose up -d\n")
-    
-    response = input("¿Milvus está corriendo? (s/n): ")
-    if response.lower() != 's':
-        print("\nPor favor, inicia Milvus primero:")
-        print("  cd ../../  # Ir a la raíz del proyecto")
-        print("  docker-compose up -d")
-        return
     
     upload_documents()
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-

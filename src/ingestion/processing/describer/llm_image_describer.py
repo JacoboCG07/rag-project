@@ -114,7 +114,8 @@ class LLMImageDescriber:
                 "Image description generated successfully",
                 extra={
                     "images_count": len(images_list),
-                    "description_length": len(description.strip())
+                    "description_length": len(description.strip()),
+                    "description": description.strip()
                 }
             )
             

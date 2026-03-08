@@ -5,6 +5,7 @@ Uses Loguru for logging with sinks to console and MongoDB
 
 import os
 import sys
+from contextvars import ContextVar
 from loguru import logger
 from datetime import datetime
 from dotenv import load_dotenv
@@ -19,6 +20,10 @@ load_dotenv()
 _logger_initialized = False
 _mongo_client: Optional[MongoClient] = None
 _mongo_collection = None
+
+# Context var to propagate job_id to all logs (even from modules that don't use logger.bind)
+# Set via set_job_id() at the start of process_single_file, read in MongoDB sink as fallback
+_current_job_id: ContextVar[Optional[str]] = ContextVar("current_job_id", default=None)
 
 
 def _initialize_logger() -> None:
@@ -100,11 +105,16 @@ def _mongodb_sink(message: Any) -> None:
             else:
                 thread_id = int(thread) if thread else 0
         
-        # Extract job_id from record["extra"] (when using logger.bind(job_id=...))
+        # Extract job_id: 1) from record["extra"] (logger.bind), 2) from contextvar (all modules)
         job_id = None
         extra_dict = record.get("extra")
         if extra_dict and isinstance(extra_dict, dict):
             job_id = extra_dict.get("job_id")
+        if job_id is None:
+            try:
+                job_id = _current_job_id.get()
+            except LookupError:
+                pass
         
         # Extract file name correctly
         file_name = "unknown"
@@ -283,6 +293,26 @@ def _setup_mongodb_sink() -> None:
         # Any other error is also ignored
         _mongo_client = None
         _mongo_collection = None
+
+
+def set_job_id(job_id: Optional[str]) -> None:
+    """
+    Sets the current job_id in the execution context.
+    All logs emitted during this context will include job_id in MongoDB (via contextvar).
+    Call at the start of process_single_file or similar entry points.
+
+    Args:
+        job_id: Job identifier, or None to clear.
+    """
+    _current_job_id.set(job_id)
+
+
+def get_job_id() -> Optional[str]:
+    """Returns the current job_id from context, or None if not set."""
+    try:
+        return _current_job_id.get()
+    except LookupError:
+        return None
 
 
 def get_logger(name: Optional[str] = None):
