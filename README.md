@@ -6,7 +6,7 @@ Este proyecto aún no está finalizado y se encuentra en evolución activa. Su a
 
 ## 🚀 Inicio Rápido
 
-## Requisitos Previos
+### Requisitos Previos
 
 - Python 3.8+
 - Docker y Docker Compose
@@ -134,8 +134,28 @@ Al acceder por primera vez, conecta a Milvus usando:
 
 - Pytest (para testeo con enfoque TDD)
 
+### Ejecutar tests
+
+```bash
+pytest
+```
+
 ## Estado del proyecto
 
 🚧 En construcción
 
 La estructura, módulos y funcionalidades pueden cambiar a medida que avanza el desarrollo.
+
+## Planes a futuro
+
+- **Búsquedas del sistema**: Acabar el diseño de las distintas búsquedas disponibles:
+  - **Simple**: finalizada.
+  - **Con metadatos**: en desarrollo.
+  - **Selector de documentos**: en desarrollo.
+
+- **Servicios separados**: Exponer ambos servicios (búsqueda e inserción de documentos) como dos servicios independientes que se puedan desplegar desde `docker-compose`.
+
+- **Sistema de colas con RabbitMQ**:
+  - Colas para el servicio de ingesta.
+  - Colas para el servicio de retriever.
+  - Colas para las distintas llamadas a modelos con OpenAI, de forma que no se sature la API.
