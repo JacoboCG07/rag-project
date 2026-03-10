@@ -138,5 +138,5 @@ SearchPipelineConfig(
 
 - [Ejemplo 2: Libro con Capítulos](../2_book_chapters/) - Búsqueda con metadatos
 - [Ejemplo 3: Manual Técnico](../3_technical_manual/) - Búsqueda simple
-- [Documentación del Pipeline](../../src/search/)
+- [Documentación del Pipeline](../../src/retrieval/)
 

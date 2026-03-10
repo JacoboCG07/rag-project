@@ -7,7 +7,7 @@ para un caso de uso de reclutamiento.
 
 Escenario:
 - 1 propuesta de trabajo (job_proposal.pdf)
-- 3 CVs de candidatos (cv_candidate_1.pdf, cv_candidate_2.pdf, cv_candidate_3.pdf)
+- 4 CVs de candidatos (cv_candidate_1.pdf, cv_candidate_2.pdf, cv_candidate_3.pdf, cv_candidate_4.pdf)
 
 El sistema primero selecciona qué documentos (CVs) son relevantes para la pregunta
 y luego busca información específica dentro de ellos.
@@ -21,10 +21,9 @@ from pathlib import Path
 root_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
-from llms.text import OpenAITextModel
-from src.search.config import SearchPipelineConfig, SearchType
-from src.search.pipeline import SearchPipeline
-from src.llms.embeddings.openai_embedder import OpenAIEmbedder
+from src.llms.text import OpenAITextModel
+from src.retrieval.config import SearchPipelineConfig, SearchType
+from src.retrieval.pipeline import SearchPipeline
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -33,24 +32,20 @@ logger = get_logger(__name__)
 def setup_pipeline():
     """Configura el pipeline de búsqueda con selección de documentos"""
     
-    # Crear modelo LLM para selección de documentos
     text_model = OpenAITextModel(model="gpt-4o-mini")
-    
-    # Configurar pipeline con estrategia WITH_SELECTION
-    # Usa la misma colección que se usó para subir los documentos
     config = SearchPipelineConfig(
         search_type=SearchType.WITH_SELECTION,
-        collection_name="cv_recruitment",  # Misma colección que en upload_documents.py
+        collection_name="cv_recruitment",
         text_model=text_model,
         search_limit=10,
         chooser_max_tokens=500,
-        chooser_temperature=0.2
+        chooser_temperature=0.2,
     )
     
     return SearchPipeline(config=config)
 
 
-def run_recruitment_queries():
+def run_search_queries():
     """Ejecuta consultas de ejemplo sobre los CVs y la propuesta de trabajo"""
     
     print("=" * 80)
@@ -61,40 +56,24 @@ def run_recruitment_queries():
     print("  - cv_candidate_1.pdf: CV del Candidato 1")
     print("  - cv_candidate_2.pdf: CV del Candidato 2")
     print("  - cv_candidate_3.pdf: CV del Candidato 3")
+    print("  - cv_candidate_4.pdf: CV del Candidato 4")
     print("\n" + "=" * 80 + "\n")
     
     # Queries de ejemplo
     queries = [
-        "¿Qué candidato tiene experiencia en Python y desarrollo backend?",
-        "¿Quién cumple mejor con los requisitos técnicos de la propuesta de trabajo?",
-        "¿Qué candidato tiene más años de experiencia profesional?",
-        "¿Algún candidato tiene experiencia con bases de datos vectoriales o Milvus?",
-        "¿Qué formación académica tienen los candidatos?",
-        "¿Cuáles son los requisitos principales de la propuesta de trabajo?"
+        "¿Quién cumple mejor con los requisitos técnicos de la propuesta de trabajo?"
     ]
     
-    # Inicializar embedder
-    embedder = OpenAIEmbedder(model="text-embedding-ada-002")
-    
-    # Crear pipeline
+    # Crear pipeline (cada estrategia genera el embedding de la query internamente)
     with setup_pipeline() as pipeline:
         for i, query in enumerate(queries, 1):
-            print(f"\n{'─' * 80}")
+            print(f"\n{'-' * 80}")
             print(f"CONSULTA {i}: {query}")
-            print('─' * 80)
+            print("-" * 80)
             
             try:
-                # Generar embedding de la query
-                query_embedding, _ = embedder.generate_embedding(text=query)
-                
-                # Realizar búsqueda
-                # El pipeline automáticamente:
-                # 1. Selecciona documentos relevantes usando el LLM
-                # 2. Busca en esos documentos seleccionados
-                results = pipeline.search(
-                    query_embedding=query_embedding,
-                    user_query=query  # Requerido para WITH_SELECTION
-                )
+                # Realizar búsqueda (la estrategia genera el embedding internamente)
+                results = pipeline.search(query=query)
                 
                 # Mostrar resultados
                 if results:
@@ -113,7 +92,7 @@ def run_recruitment_queries():
                 print(f"\n✗ Error: {str(e)}")
     
     print("\n" + "=" * 80)
-    print("FIN DEL EJEMPLO")
+    print("FIN DE LA BÚSQUEDA")
     print("=" * 80)
 
 
@@ -128,17 +107,17 @@ def main():
         "job_proposal.pdf",
         "cv_candidate_1.pdf",
         "cv_candidate_2.pdf",
-        "cv_candidate_3.pdf"
+        "cv_candidate_3.pdf",
+        "cv_candidate_4.pdf",
     ]
     
     missing_files = [f for f in expected_files if not (data_dir / f).exists()]
     
     if missing_files:
-        print("⚠️  ADVERTENCIA: Los siguientes archivos no se encontraron:")
+        print("⚠️  ADVERTENCIA: Los siguientes archivos no se encontraron en data/:")
         for f in missing_files:
             print(f"   - {f}")
-        print("\nPor favor, añade los documentos a la carpeta 'data/' antes de ejecutar.")
-        print("Los archivos deben estar previamente indexados en Milvus.\n")
+        print("\nEjecuta primero 'python upload_documents.py' para indexar los documentos.\n")
         
         response = input("¿Deseas continuar de todas formas? (s/n): ")
         if response.lower() != 's':
@@ -146,7 +125,7 @@ def main():
             return
     
     try:
-        run_recruitment_queries()
+        run_search_queries()
     except Exception as e:
         logger.error(f"Error ejecutando el ejemplo: {str(e)}", exc_info=True)
         print(f"\n❌ Error: {str(e)}")
@@ -159,8 +138,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
 
