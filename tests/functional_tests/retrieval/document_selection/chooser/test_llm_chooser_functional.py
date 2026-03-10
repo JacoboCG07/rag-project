@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 # Add project root and src to path
 # Calculate project root: go up from test file to project root
-# test_llm_chooser_functional.py -> chooser/ -> document_selection/ -> search/ -> functional_tests/ -> tests/ -> project_root
+# test_llm_chooser_functional.py -> chooser/ -> document_selection/ -> retrieval/ -> functional_tests/ -> tests/ -> project_root
 _current_file = Path(__file__).resolve()
 project_root = _current_file.parent.parent.parent.parent.parent.parent
 src_path = project_root / "src"
@@ -28,7 +28,7 @@ if env_path.exists():
 
 # Import using importlib to avoid __init__.py issues
 import importlib.util
-llm_chooser_path = src_path / "search" / "document_selection" / "chooser" / "llm_chooser.py"
+llm_chooser_path = src_path / "retrieval" / "document_selection" / "chooser" / "llm_chooser.py"
 spec = importlib.util.spec_from_file_location("llm_chooser", llm_chooser_path)
 llm_chooser_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(llm_chooser_module)
@@ -75,46 +75,46 @@ def sample_summaries():
         {
             "file_id": "doc_001",
             "file_name": "manual_instalacion.pdf",
-            "type_file": "PDF",
-            "total_pages": "50",
-            "total_chapters": "5",
-            "total_num_image": "10",
+            "file_type": "PDF",
+            "pages": "50",
+            "chapters": "5",
+            "full_images": "10",
             "text": "Manual completo de instalación del sistema. Incluye requisitos, pasos detallados y solución de problemas comunes."
         },
         {
             "file_id": "doc_002",
             "file_name": "guia_usuario.pdf",
-            "type_file": "PDF",
-            "total_pages": "120",
-            "total_chapters": "12",
-            "total_num_image": "45",
+            "file_type": "PDF",
+            "pages": "120",
+            "chapters": "12",
+            "full_images": "45",
             "text": "Guía de usuario completa con todas las funcionalidades del sistema. Incluye ejemplos prácticos y casos de uso."
         },
         {
             "file_id": "doc_003",
             "file_name": "api_reference.pdf",
-            "type_file": "PDF",
-            "total_pages": "200",
-            "total_chapters": "15",
-            "total_num_image": "30",
+            "file_type": "PDF",
+            "pages": "200",
+            "chapters": "15",
+            "full_images": "30",
             "text": "Referencia completa de la API del sistema. Documentación técnica con ejemplos de código y endpoints."
         },
         {
             "file_id": "doc_004",
             "file_name": "troubleshooting.pdf",
-            "type_file": "PDF",
-            "total_pages": "80",
-            "total_chapters": "8",
-            "total_num_image": "20",
+            "file_type": "PDF",
+            "pages": "80",
+            "chapters": "8",
+            "full_images": "20",
             "text": "Guía de solución de problemas. Errores comunes, diagnósticos y soluciones paso a paso."
         },
         {
             "file_id": "doc_005",
             "file_name": "arquitectura.pdf",
-            "type_file": "PDF",
-            "total_pages": "150",
-            "total_chapters": "10",
-            "total_num_image": "60",
+            "file_type": "PDF",
+            "pages": "150",
+            "chapters": "10",
+            "full_images": "60",
             "text": "Documentación de arquitectura del sistema. Diseño, componentes, flujos de datos y decisiones técnicas."
         }
     ]
@@ -123,7 +123,7 @@ def sample_summaries():
 @pytest.fixture
 def sample_markdown(sample_summaries):
     """Fixture with sample markdown descriptions"""
-    formatter_path = src_path / "search" / "document_selection" / "formatter.py"
+    formatter_path = src_path / "retrieval" / "common" / "formatter.py"
     spec = importlib.util.spec_from_file_location("formatter", formatter_path)
     formatter_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(formatter_module)
@@ -222,7 +222,7 @@ class TestLLMDocumentChooserFunctional:
         for doc in selected_docs:
             assert "file_id" in doc
             assert "file_name" in doc
-            assert "type_file" in doc
+            assert "file_type" in doc
             assert "text" in doc
             assert doc["file_id"] in [s["file_id"] for s in sample_summaries]
     
