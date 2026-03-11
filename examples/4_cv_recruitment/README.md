@@ -1,8 +1,8 @@
-# Ejemplo 1: Sistema de Reclutamiento con CVs
+# Ejemplo 4: Sistema de Reclutamiento con CVs
 
 ## 📋 Descripción
 
-Este ejemplo demuestra el uso de la estrategia **WITH_SELECTION** (`document_selector_search`) en un caso de uso real de reclutamiento.
+Este ejemplo demuestra el uso de la estrategia **WITH_SELECTION** (`document_selector_search.py`) en un caso de uso real de reclutamiento.
 
 ## 🎯 Escenario
 
@@ -13,6 +13,7 @@ Tienes una propuesta de trabajo y varios CVs de candidatos. Necesitas hacer preg
 - `cv_candidate_1.pdf`: CV del Candidato 1
 - `cv_candidate_2.pdf`: CV del Candidato 2
 - `cv_candidate_3.pdf`: CV del Candidato 3
+- `cv_candidate_4.pdf`: CV del Candidato 4
 
 ### Preguntas Ejemplo
 - "¿Qué candidato tiene experiencia en Python y desarrollo backend?"
@@ -33,16 +34,18 @@ La estrategia **WITH_SELECTION** funciona en dos pasos:
 
 ### 1. Preparar los Documentos
 
-Coloca los 4 archivos PDF en la carpeta `data/`:
+Coloca los 5 archivos PDF en la carpeta `data/`:
 ```
-1_cv_recruitment/
+4_cv_recruitment/
 ├── data/
 │   ├── job_proposal.pdf
 │   ├── cv_candidate_1.pdf
 │   ├── cv_candidate_2.pdf
-│   └── cv_candidate_3.pdf
+│   ├── cv_candidate_3.pdf
+│   └── cv_candidate_4.pdf
 ├── upload_documents.py
-├── run_example.py
+├── run_retrieval.py
+├── run_chatbot.py
 └── README.md
 ```
 
@@ -59,7 +62,7 @@ docker-compose up -d
 **⚠️ IMPORTANTE: Debes ejecutar este paso primero**
 
 ```bash
-cd examples/1_cv_recruitment
+cd examples/4_cv_recruitment
 python upload_documents.py
 ```
 
@@ -71,17 +74,25 @@ Este script:
 
 ### 4. Ejecutar las Búsquedas
 
-Una vez indexados los documentos, ejecuta el ejemplo:
+Una vez indexados los documentos, ejecuta la búsqueda:
 
 ```bash
-python run_example.py
+python run_retrieval.py
+```
+
+### 5. Ejecutar el Chatbot (opcional)
+
+Para obtener respuestas generadas por el LLM a partir de los documentos recuperados:
+
+```bash
+python run_chatbot.py
 ```
 
 ## 📊 Salida Esperada
 
 ```
 ================================================================================
-EJEMPLO 1: SISTEMA DE RECLUTAMIENTO CON CVs
+EJEMPLO 4: SISTEMA DE RECLUTAMIENTO CON CVs
 ================================================================================
 
 Documentos en el sistema:
@@ -89,6 +100,7 @@ Documentos en el sistema:
   - cv_candidate_1.pdf: CV del Candidato 1
   - cv_candidate_2.pdf: CV del Candidato 2
   - cv_candidate_3.pdf: CV del Candidato 3
+  - cv_candidate_4.pdf: CV del Candidato 4
 
 ================================================================================
 
@@ -118,13 +130,13 @@ El ejemplo usa la siguiente configuración:
 ```python
 SearchPipelineConfig(
     search_type=SearchType.WITH_SELECTION,
-    collection_name_documents="documents",
-    collection_name_summaries="summaries",
+    collection_name="cv_recruitment",
     text_model=OpenAITextModel(model="gpt-4o-mini"),
     search_limit=10,
     chooser_max_tokens=500,
-    chooser_temperature=0.2
+    chooser_temperature=0.2,
 )
+# La colección cv_recruitment tiene dos particiones: 'documents' y 'summaries'
 ```
 
 ## 💡 Ventajas de WITH_SELECTION
@@ -135,8 +147,5 @@ SearchPipelineConfig(
 - ✅ **Flexibilidad**: Funciona con cualquier tipo de documento
 
 ## 🔗 Ver También
-
-- [Ejemplo 2: Libro con Capítulos](../2_book_chapters/) - Búsqueda con metadatos
-- [Ejemplo 3: Manual Técnico](../3_technical_manual/) - Búsqueda simple
-- [Documentación del Pipeline](../../src/retrieval/)
-
+<
+- [Ejemplo 1: El Principito](../1_principito/) - Búsqueda simple y chatbot

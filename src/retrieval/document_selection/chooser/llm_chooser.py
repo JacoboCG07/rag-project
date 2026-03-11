@@ -113,6 +113,15 @@ class LLMDocumentChooser:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
             )
+
+            self.logger.info(
+                "Chooser I/O | system_prompt:\n%s\n---\nprompt:\n%s\n---\nresponse:\n%s",
+                extra={
+                    "system_prompt": system_prompt,
+                    "prompt": prompt,
+                    "response": response,
+                }
+            )
             
             # Parse response to extract file_ids
             selected_ids = self._parse_response(response, summaries)

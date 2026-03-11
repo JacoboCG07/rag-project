@@ -32,7 +32,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
-JOB_ID = "example_1"
+JOB_ID = "ingestion_example_4"
 
 def upload_documents():
     """Sube e indexa todos los documentos del ejemplo en Milvus"""
@@ -89,7 +89,7 @@ def upload_documents():
                     success, message, result_info = pipeline.process_single_file(
                         file_path=str(file_path),
                         extract_process_images=False,
-                        job_id=JOB_ID
+                        job_id=f"{JOB_ID}.{i}"
                     )
                     
                     if success:

@@ -164,12 +164,9 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
                 exc_info=True
             )
             raise
-        finally:
-            # Disconnect from Milvus
-            try:
-                self.searcher.disconnect()
-            except Exception as e:
-                self.logger.warning(f"Error disconnecting from Milvus: {str(e)}")
+        # No llamar a searcher.disconnect() aquí: comparte la conexión (alias) con SummaryRetriever.
+        # Si desconectamos, la siguiente pregunta falla en get_all_summaries() con "should create connection first".
+        # La colección se libera al cerrar la estrategia en close().
     
     def close(self) -> None:
         """
@@ -179,7 +176,11 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
         try:
             if self.document_selector is not None:
                 self.document_selector.close()
-            # Note: searcher.disconnect() is called after each search
+            # Liberar colección del searcher al cerrar (no desconectar: el retriever ya cerró la conexión)
+            try:
+                self.searcher.disconnect()
+            except Exception as e:
+                self.logger.warning(f"Error releasing searcher: {str(e)}")
             self.logger.info("DocumentSelectorSearchStrategy closed successfully")
         except Exception as e:
             self.logger.error(

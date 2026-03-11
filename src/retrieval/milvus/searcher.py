@@ -27,7 +27,9 @@ class MilvusSearcher:
         self.collection = None
     
     def connect(self):
-        """Conecta a Milvus y carga la colección"""
+        """Conecta a Milvus y carga la colección. Idempotente: si ya está conectado y la colección cargada, no hace nada."""
+        if self.collection is not None:
+            return
         host = os.getenv("MILVUS_HOST", "localhost")
         port = os.getenv("MILVUS_PORT", "19530")
 
@@ -148,7 +150,14 @@ class MilvusSearcher:
             raise Exception(f"Error obteniendo particiones: {str(e)}")
     
     def disconnect(self):
-        """Cierra la conexión con Milvus"""
-        self.collection.release()
-        connections.disconnect(alias=self.alias)
+        """
+        Libera la colección de memoria. No cierra la conexión global (alias), porque
+        en estrategias con selección (DocumentSelector) el SummaryRetriever comparte
+        la misma conexión y debe seguir usándola en consultas siguientes.
+        La conexión se cierra al cerrar el pipeline/estrategia.
+        """
+        if self.collection is not None:
+            self.collection.release()
+            self.collection = None
+        # No llamar a connections.disconnect(): la conexión es compartida con SummaryRetriever
 

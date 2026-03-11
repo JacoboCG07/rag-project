@@ -90,18 +90,19 @@ class RAGChatbot:
             raise RuntimeError("Chatbot has been closed")
         return self._llm
 
-    def ask(self, query: str) -> str:
+    def ask(self, query: str, job_id: Optional[str] = None) -> str:
         """
         Answer a question using retrieval + LLM generation.
 
         Args:
             query: User question.
+            job_id: Optional job identifier for tracking logs.
 
         Returns:
             str: Generated answer.
         """
         self.logger.info("Processing query", extra={"query_length": len(query)})
-        results = self.pipeline.search(query=query)
+        results = self.pipeline.search(query=query, job_id=job_id)
         context = _format_context(results)
         prompt, system_prompt = _get_rag_prompt(user_query=query, context=context)
 

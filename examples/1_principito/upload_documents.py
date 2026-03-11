@@ -29,6 +29,7 @@ from src.utils import get_logger
 logger = get_logger(__name__)
 
 JOB_ID = "prueba_1"
+EXTRACT_IMAGES = True
 
 def upload_documents():
     """Sube e indexa todos los documentos del ejemplo en Milvus"""
@@ -36,6 +37,20 @@ def upload_documents():
     print("=" * 80)
     print("SUBIDA DE DOCUMENTOS - Pruebas de RAG")
     print("=" * 80)
+    
+    if EXTRACT_IMAGES:
+        print("\n⚠️  EXTRACT_IMAGES está activado (True).")
+        print("   La búsqueda incorporará las imágenes de los documentos.")
+        print("   Esto conlleva más gasto en OpenAI (por cada imagen se hará una descripción).")
+        print("   Si no quieres incorporar las imágenes modifica la variable EXTRACT_IMAGES de este archivo a False.\n")
+        while True:
+            respuesta = input("¿Quieres continuar? (s/n): ").strip().lower()
+            if respuesta in ("s", "si", "y", "yes"):
+                break
+            if respuesta in ("n", "no"):
+                print("Subida cancelada.")
+                return
+            print("Responde 's' para sí o 'n' para no.")
     
     # Ruta a la carpeta de datos
     data_dir = Path(__file__).parent / "data"
@@ -59,7 +74,7 @@ def upload_documents():
         config = IngestionPipelineConfig(
             collection_name=collection_name,
             chunk_size=2000,
-            extract_images=True,
+            extract_images=EXTRACT_IMAGES,
         )
         
         with IngestionPipeline(config=config) as pipeline:
@@ -108,7 +123,8 @@ def upload_documents():
                 print(f"   Colección utilizada: {collection_name}")
                 print(f"   - Partición documentos: documents")
                 print(f"   - Partición resúmenes: summaries")
-                print("   Ejecuta 'python run_example.py' para probar las búsquedas.")
+                print("   Ejecuta 'python run_retrieval.py' para probar las búsquedas. (devolverá solo los fragmentos de texto similares a la consulta)")
+                print("   Ejecuta 'python run_chatbot.py' para probar el chatbot. (devolverá una respuesta basada en los fragmentos extraidos de la búsqueda)")
             
     except Exception as e:
         logger.error(f"Error en el pipeline: {str(e)}", exc_info=True)
@@ -122,7 +138,7 @@ def upload_documents():
 def main():
     """Función principal"""
     
-    print("\n📤 Iniciando subida de documentos para Ejemplo 1: CVs...\n")
+    print("\n📤 Iniciando subida de documentos para Ejemplo 1: El Principito...\n")
     
     # Verificar que Milvus está disponible
     print("ℹ️  Asegúrate de que Milvus está corriendo:")

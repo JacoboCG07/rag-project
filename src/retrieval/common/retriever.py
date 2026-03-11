@@ -65,8 +65,9 @@ class SummaryRetriever:
             port=port
         )
         
-        # Load collection
+        # Load collection and load it into memory for queries
         self.collection: Collection = self.milvus_client.load_collection()
+        self.collection.load()
         
         self.logger.info(
             "SummaryRetriever initialized successfully",

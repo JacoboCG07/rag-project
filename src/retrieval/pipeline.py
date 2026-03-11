@@ -10,7 +10,7 @@ from src.retrieval.strategies import (
     DocumentSelectorSearchStrategy,
     DocumentSelectorMetadataSearchStrategy
 )
-from src.utils import get_logger
+from src.utils import get_logger, set_job_id
 
 
 class SearchPipeline:
@@ -85,7 +85,8 @@ class SearchPipeline:
         self,
         query: str,
         partition_names: Optional[List[str]] = None,
-        filter_expr: Optional[str] = None
+        filter_expr: Optional[str] = None,
+        job_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Performs search using the configured strategy.
@@ -97,6 +98,7 @@ class SearchPipeline:
             query: Texto de la consulta del usuario. La estrategia lo convierte a embedding.
             partition_names: List of partition names to search in (None = all partitions).
             filter_expr: Optional filter expression (e.g., 'file_id == "123"').
+            job_id: Optional job identifier for tracking logs. If provided, will be included in all logs.
             
         Returns:
             List[Dict[str, Any]]: List of documents found with their scores and metadata.
@@ -104,22 +106,28 @@ class SearchPipeline:
         Raises:
             ValueError: If required parameters are missing for the selected strategy.
         """
-        self.logger.info(
-            "Starting search",
-            extra={
-                "search_type": self.config.search_type.value,
-                "strategy": self.strategy.__class__.__name__,
-                "has_partition_names": partition_names is not None,
-                "has_filter_expr": filter_expr is not None
-            }
-        )
-        
-        # Delegate to the strategy (cada estrategia genera el embedding internamente)
-        return self.strategy.search(
-            query=query,
-            partition_names=partition_names,
-            filter_expr=filter_expr
-        )
+        if job_id:
+            set_job_id(job_id)
+        try:
+            self.logger.info(
+                "Starting search",
+                extra={
+                    "search_type": self.config.search_type.value,
+                    "strategy": self.strategy.__class__.__name__,
+                    "has_partition_names": partition_names is not None,
+                    "has_filter_expr": filter_expr is not None
+                }
+            )
+            
+            # Delegate to the strategy (cada estrategia genera el embedding internamente)
+            return self.strategy.search(
+                query=query,
+                partition_names=partition_names,
+                filter_expr=filter_expr
+            )
+        finally:
+            if job_id:
+                set_job_id(None)
     
     def close(self) -> None:
         """Closes connections with the strategy."""

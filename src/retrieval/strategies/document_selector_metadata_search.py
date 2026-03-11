@@ -265,12 +265,8 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 exc_info=True
             )
             raise
-        finally:
-            # Disconnect from Milvus
-            try:
-                self.searcher.disconnect()
-            except Exception as e:
-                self.logger.warning(f"Error disconnecting from Milvus: {str(e)}")
+        # No llamar a searcher.disconnect() aquí: comparte la conexión con SummaryRetriever/MetadataSelector.
+        # La colección se libera al cerrar la estrategia en close().
     
     def close(self) -> None:
         """
@@ -282,7 +278,10 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 self.document_selector.close()
             if self.metadata_selector is not None:
                 self.metadata_selector.close()
-            # Note: searcher.disconnect() is called after each search
+            try:
+                self.searcher.disconnect()
+            except Exception as e:
+                self.logger.warning(f"Error releasing searcher: {str(e)}")
             self.logger.info("DocumentSelectorMetadataSearchStrategy closed successfully")
         except Exception as e:
             self.logger.error(

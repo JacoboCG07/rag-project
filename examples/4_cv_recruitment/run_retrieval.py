@@ -28,6 +28,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "retrieval_example_4"
 
 def setup_pipeline():
     """Configura el pipeline de búsqueda con selección de documentos"""
@@ -73,7 +74,7 @@ def run_search_queries():
             
             try:
                 # Realizar búsqueda (la estrategia genera el embedding internamente)
-                results = pipeline.search(query=query)
+                results = pipeline.search(query=query, job_id=f"{JOB_ID}.{i}")
                 
                 # Mostrar resultados
                 if results:
@@ -138,4 +139,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
