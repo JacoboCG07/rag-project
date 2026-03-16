@@ -18,6 +18,8 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "chatbot_example_1"
+
 
 def create_chatbot_config() -> ChatbotConfig:
     """Configuración del chatbot (retriever + LLM)."""
@@ -51,7 +53,7 @@ def main():
             print(f"PREGUNTA {i}: {query}")
             print("-" * 80)
             try:
-                answer = bot.ask(query)
+                answer = bot.ask(query, job_id=f"{JOB_ID}.{i}")
                 print(f"\nRespuesta:\n{answer}\n")
             except Exception as e:
                 logger.error(f"Error en pregunta {i}: {str(e)}", exc_info=True)

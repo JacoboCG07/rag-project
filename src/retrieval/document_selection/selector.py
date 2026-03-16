@@ -70,15 +70,12 @@ class DocumentSelector:
         Returns:
             List[str]: List of selected file_ids.
         """
-        self.logger.info(f"Executing selection: {user_query}")
         
         # Step 1: Retrieve summaries
         summaries = self.retriever.get_all_summaries()
-        self.logger.info(f"✓ Summaries retrieved: {len(summaries)}")
         
         # Step 2: Generate markdown
         markdown = self.markdown_generator.generate_all_documents_markdown(summaries)
-        self.logger.info(f"✓ Markdown generated")
         
         # Step 3: Select with LLM
         selected_ids = self.chooser.choose_documents(
@@ -86,7 +83,6 @@ class DocumentSelector:
             user_query=user_query,
             summaries=summaries
         )
-        self.logger.info(f"✓ Documents selected: {len(selected_ids)}")
         
         return selected_ids
 

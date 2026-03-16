@@ -104,11 +104,9 @@ class MetadataSelector:
         
         # Step 1: Retrieve summaries of selected documents
         summaries = self.retriever.get_summaries_by_file_ids(selected_file_ids)
-        self.logger.info(f"✓ Summaries retrieved: {len(summaries)}")
         
         # Step 2: Generate markdown
         markdown = self.markdown_generator.generate_all_documents_markdown(summaries)
-        self.logger.info(f"✓ Markdown generated")
         
         # Step 3: Extract metadata with LLM
         metadata_dict = self.extractor.extract(
@@ -116,7 +114,6 @@ class MetadataSelector:
             markdown_documents=markdown,
             documents_info=summaries
         )
-        self.logger.info(f"✓ Metadata extracted: {len(metadata_dict)} documents")
         
         # Step 4: Build filter expressions for each document
         result = []
@@ -130,7 +127,6 @@ class MetadataSelector:
                 expresion_milvus=filter_expr
             ))
         
-        self.logger.info(f"✓ Filters built: {len(result)} documents")
         
         return result
 

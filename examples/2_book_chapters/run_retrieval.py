@@ -28,6 +28,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+JOB_ID = "retrieval_example_2"
 
 def setup_pipeline():
     """Configura el pipeline de búsqueda con selección y metadatos"""
@@ -53,7 +54,7 @@ def run_search_queries():
     print("\n" + "=" * 80 + "\n")
     
     queries = [
-        "¿Qué dice el capítulo 3 sobre metodologías de desarrollo?"
+        "¿Qué dice el capítulo 3"
     ]
     
     with setup_pipeline() as pipeline:
@@ -62,10 +63,10 @@ def run_search_queries():
             print(f"CONSULTA {i}: {query}")
             print("-" * 80)
             try:
-                results = pipeline.search(query=query)
+                results = pipeline.search(query=query, job_id=f"{JOB_ID}.{i}")
                 if results:
                     print(f"\n✓ Encontrados {len(results)} resultados:\n")
-                    for j, result in enumerate(results[:3], 1):
+                    for j, result in enumerate(results[:3], 1):  # Mostrar top 3
                         print(f"{j}. Documento: {result.get('file_name', 'N/A')}")
                         print(f"   Score: {result.get('score', 0):.4f}")
                         print(f"   Páginas: {result.get('pages', 'N/A')}")

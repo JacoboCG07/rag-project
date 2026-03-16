@@ -3,11 +3,13 @@ LLM-based document chooser implementation
 Uses text models to select relevant documents based on user queries
 """
 
-from typing import Optional, List, Dict, Any
-from src.llms.text import BaseTextModel, OpenAITextModel
-from src.utils.utils import PromptLoader
-from src.utils import get_logger
+import json
+import re
 
+from src.utils import get_logger
+from src.llms.text import BaseTextModel
+from src.utils.utils import PromptLoader
+from typing import Optional, List, Dict, Any, Tuple
 
 class LLMDocumentChooser:
     """
@@ -115,7 +117,7 @@ class LLMDocumentChooser:
             )
 
             self.logger.info(
-                "Chooser I/O | system_prompt:\n%s\n---\nprompt:\n%s\n---\nresponse:\n%s",
+                "Chooser prompts and response",
                 extra={
                     "system_prompt": system_prompt,
                     "prompt": prompt,
@@ -123,15 +125,19 @@ class LLMDocumentChooser:
                 }
             )
             
-            # Parse response to extract file_ids
-            selected_ids = self._parse_response(response, summaries)
-            
+            # Parse response to extract file_ids and think (for logging)
+            selected_ids, think = self._parse_response(response, summaries)
+            id_to_name = {s.get("file_id"): s.get("file_name", "?") for s in summaries if s.get("file_id")}
+            selected_names = [id_to_name.get(fid, "?") for fid in selected_ids]
+
             self.logger.info(
                 "Documents selected successfully",
                 extra={
                     "total_available": len(summaries),
                     "selected_count": len(selected_ids),
-                    "selected_ids": selected_ids
+                    "selected_file_names": selected_names,
+                    "selected_ids": selected_ids,
+                    "think": think,
                 }
             )
             
@@ -174,39 +180,60 @@ class LLMDocumentChooser:
         
         return prompt, system_prompt
 
-    def _parse_response(self, response: str, summaries: List[Dict[str, Any]]) -> List[str]:
+    def _parse_response(self, response: str, summaries: List[Dict[str, Any]]) -> Tuple[List[str], str]:
         """
-        Parses LLM response to extract selected file_ids.
+        Parses LLM response to extract selected file_ids and optional think (reasoning).
 
         Args:
-            response: LLM model response.
+            response: LLM model response (expected JSON with think and file_ids, or fallback plain list).
             summaries: List of dictionaries with document information.
 
         Returns:
-            List[str]: List of valid file_ids.
+            Tuple[List[str], str]: (list of valid file_ids, think string for logging; empty if not present).
         """
         self.logger.debug(
             "Parsing LLM response",
             extra={"raw_response": response}
         )
 
-        # Clean response
         response = response.strip()
-        
-        # Extract file_ids (separated by commas, spaces, or newlines)
-        import re
-        # Search for all possible file_ids (assuming format doc_XXX or similar)
-        potential_ids = re.split(r'[,\s\n]+', response)
-        
-        # Clean and filter empty IDs
-        potential_ids = [id.strip() for id in potential_ids if id.strip()]
-        
-        # Create set of valid file_ids from available documents
         valid_file_ids = {summary.get("file_id") for summary in summaries if summary.get("file_id")}
-        
-        # Filter only file_ids that exist in available documents
+        think = ""
+
+        # Try JSON format first: {"think": "...", "file_ids": [...]}
+        text_to_parse = response
+        if "```" in response:
+            # Strip markdown code block if present
+            for marker in ("```json", "```"):
+                if marker in response:
+                    start = response.find(marker) + len(marker)
+                    end = response.find("```", start)
+                    if end == -1:
+                        end = len(response)
+                    text_to_parse = response[start:end].strip()
+                    break
+
+        try:
+            data = json.loads(text_to_parse)
+            if isinstance(data, dict):
+                think = (data.get("think") or "").strip() if isinstance(data.get("think"), str) else ""
+                raw_ids = data.get("file_ids")
+                if isinstance(raw_ids, list):
+                    potential_ids = [str(x).strip() for x in raw_ids if x]
+                else:
+                    potential_ids = []
+            else:
+                potential_ids = []
+        except (json.JSONDecodeError, TypeError):
+            potential_ids = []
+
+        # Fallback: treat response as comma/space/newline-separated file_ids (no think)
+        if not potential_ids:
+            potential_ids = re.split(r'[,\s\n]+', response)
+            potential_ids = [id.strip() for id in potential_ids if id.strip()]
+
         selected_ids = [id for id in potential_ids if id in valid_file_ids]
-        
+
         self.logger.debug(
             "Parsed IDs",
             extra={
@@ -221,8 +248,8 @@ class LLMDocumentChooser:
                 "Could not parse valid file_ids from response",
                 extra={"response": response}
             )
-        
-        return selected_ids
+
+        return selected_ids, think
 
     def choose_documents_with_details(
         self,
@@ -257,4 +284,3 @@ class LLMDocumentChooser:
         )
         
         return selected_summaries
-

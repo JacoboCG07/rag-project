@@ -106,7 +106,6 @@ class SummaryRetriever:
             
             self.logger.info(
                 f"Retrieved {len(results)} summaries",
-                extra={"count": len(results)}
             )
             
             # Process results (fields match Milvus schema)

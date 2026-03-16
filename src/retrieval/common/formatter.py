@@ -47,16 +47,19 @@ class MarkdownGenerator:
             full_images = summary.full_images
             description = summary.text
 
+        # Mostrar solo la extensión (lo que va detrás del último punto)
+        file_type = file_type.rsplit(".", 1)[-1] if "." in file_type else file_type
+
         # Generate markdown
-        markdown = f"""## 📄 {file_name}
+        markdown = f"""## {file_name}
 
 - **ID:** `{file_id}`  
-- **Tipo:** {file_type}  
+- **Tipo:** {file_type} 
+- **Capítulos:** {chapters}   
 - **Páginas:** {pages}  
-- **Capítulos:** {chapters}  
 - **Imágenes:** {full_images}  
 
-**Descripción:**  
+### Descripción:  
 {description}
 """
         
@@ -74,17 +77,16 @@ class MarkdownGenerator:
         Returns:
             str: Complete markdown with all documents.
         """
-        self.logger.info(
+        self.logger.debug(
             f"Generating markdown for {len(summaries)} documents",
             extra={"count": len(summaries)}
         )
 
         if not summaries:
-            return "# 📚 Biblioteca de Documentos\n\nNo hay documentos disponibles."
+            return "#\n\nNo hay documentos disponibles."
 
         # General header
         markdown_parts = [
-            "# 📚 Biblioteca de Documentos\n",
             f"Total de documentos: **{len(summaries)}**\n",
             "---\n"
         ]
@@ -93,12 +95,12 @@ class MarkdownGenerator:
         for summary in summaries:
             document_markdown = self.generate_document_markdown(summary)
             markdown_parts.append(document_markdown)
-            markdown_parts.append("---\n")
+            markdown_parts.append("\n")
 
         # Join all parts
         full_markdown = "\n".join(markdown_parts)
         
-        self.logger.info("Markdown generated successfully")
+        self.logger.debug("Markdown generated successfully")
         
         return full_markdown
 

@@ -75,13 +75,17 @@ class MetadataFilterBuilder:
                 filter_parts.append(num_image_filter)
         
         # File type (Milvus schema field)
+        # Milvus almacena extensiones como ".pdf", ".txt"; el LLM devuelve "PDF", "TXT"
         if metadata.get("file_type"):
-            filter_parts.append(f'file_type == "{metadata["file_type"]}"')
+            ft = self._normalize_file_type_for_milvus(metadata["file_type"])
+            if ft:
+                filter_parts.append(f'file_type == "{ft}"')
         
         # Combinar con AND
         filter_expr = " and ".join(filter_parts)
         
-        self.logger.debug(f"Filter built: {filter_expr}")
+        self.logger.info(f"Filter built:", extra={"filter_expr": filter_expr})
+
         return filter_expr
     
     # def build_combined_filter(
@@ -157,6 +161,18 @@ class MetadataFilterBuilder:
     #     file_ids_str = ", ".join([f'"{fid}"' for fid in file_ids])
     #     return f'file_id in [{file_ids_str}]'
     
+    def _normalize_file_type_for_milvus(self, file_type: str) -> str:
+        """
+        Convierte file_type al formato que Milvus almacena: ".pdf", ".txt", etc.
+        El LLM devuelve "PDF" o "TXT"; Milvus usa ".pdf", ".txt".
+        """
+        if not file_type or not str(file_type).strip():
+            return ""
+        ft = str(file_type).strip().lower()
+        if not ft.startswith("."):
+            ft = f".{ft}"
+        return ft
+
     def _build_pages_filter(self, pages: List[int]) -> str:
         """
         Construye filtro para páginas.

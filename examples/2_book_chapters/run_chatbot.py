@@ -46,9 +46,7 @@ def main():
 
     config = create_chatbot_config()
     queries = [
-        "¿Qué dice el capítulo 3 sobre metodologías de desarrollo?",
-        "Resume los conceptos principales del capítulo 1.",
-        "Busca en las páginas 10 a 20 información sobre arquitectura.",
+        "¿Qué dice el capítulo 3"
     ]
 
     with RAGChatbot(config=config) as bot:

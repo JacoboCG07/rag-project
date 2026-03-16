@@ -28,8 +28,8 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
-JOB_ID = "prueba_1"
-EXTRACT_IMAGES = True
+JOB_ID = "prueba_11"
+EXTRACT_IMAGES = False
 
 def upload_documents():
     """Sube e indexa todos los documentos del ejemplo en Milvus"""
@@ -57,7 +57,7 @@ def upload_documents():
     
     # Lista de documentos a procesar
     expected_files = [
-        "principito.pdf",
+        "principito_77.pdf",
     ]
     
     # Obtener rutas de los archivos

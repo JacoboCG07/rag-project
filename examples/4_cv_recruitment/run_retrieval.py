@@ -62,7 +62,8 @@ def run_search_queries():
     
     # Queries de ejemplo
     queries = [
-        "¿Quién cumple mejor con los requisitos técnicos de la propuesta de trabajo?"
+        # "¿Quién cumple mejor con los requisitos técnicos de la propuesta de trabajo?",
+        "Evalua absolutamente todos los candidatos teniendo en cuenta los requisitos técnicos de la propuesta de trabajo y ponles una nota de 0 a 10, y luego ordénalos de mayor a menor nota."
     ]
     
     # Crear pipeline (cada estrategia genera el embedding de la query internamente)
@@ -102,29 +103,6 @@ def main():
     
     print("\n🚀 Iniciando ejemplo de reclutamiento con CVs...\n")
     
-    # Verificar que existen los archivos de datos
-    data_dir = Path(__file__).parent / "data"
-    expected_files = [
-        "job_proposal.pdf",
-        "cv_candidate_1.pdf",
-        "cv_candidate_2.pdf",
-        "cv_candidate_3.pdf",
-        "cv_candidate_4.pdf",
-    ]
-    
-    missing_files = [f for f in expected_files if not (data_dir / f).exists()]
-    
-    if missing_files:
-        print("⚠️  ADVERTENCIA: Los siguientes archivos no se encontraron en data/:")
-        for f in missing_files:
-            print(f"   - {f}")
-        print("\nEjecuta primero 'python upload_documents.py' para indexar los documentos.\n")
-        
-        response = input("¿Deseas continuar de todas formas? (s/n): ")
-        if response.lower() != 's':
-            print("Ejemplo cancelado.")
-            return
-    
     try:
         run_search_queries()
     except Exception as e:
@@ -132,7 +110,7 @@ def main():
         print(f"\n❌ Error: {str(e)}")
         print("\nAsegúrate de que:")
         print("  1. Milvus está corriendo (docker-compose up -d)")
-        print("  2. Los documentos están indexados en las colecciones")
+        print("  2. Los documentos están indexados en las colecciones. (Puedes usar upload_documents.py para indexarlos)")
         print("  3. Las variables de entorno están configuradas (.env)")
         print("  4. Tienes una API key válida de OpenAI")
 

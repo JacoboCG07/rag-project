@@ -7,6 +7,20 @@ from .base import SearchStrategy
 from src.retrieval.milvus import MilvusSearcher
 from src.retrieval.document_selection import DocumentSelector
 from src.retrieval.metadata import MetadataSelector
+NO_DOCUMENTS_MESSAGE = "Lo siento, el sistema no encontró ningún documento relevante para esa query."
+
+# Chunk con la misma forma que un resultado de Milvus, para cuando el LLM no selecciona documentos
+NO_DOCUMENTS_CHUNK = {
+    "id": 0,
+    "score": 0.0,
+    "text": NO_DOCUMENTS_MESSAGE,
+    "file_id": "",
+    "file_name": "",
+    "source_id": "",
+    "pages": "",
+    "chapters": "",
+    "file_type": "",
+}
 
 
 class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
@@ -35,14 +49,14 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 "Please configure it in SearchPipelineConfig."
             )
         
-        # Initialize MilvusSearcher for document search (misma colección, partición 'documents')
+        # Initialize MilvusSearcher for document search (same collection, partition 'documents')
         self.searcher = MilvusSearcher(
             db_name=config.milvus.dbname,
             collection_name=config.collection_name,
             alias=config.milvus.alias
         )
         
-        # Initialize DocumentSelector (misma colección, partición 'summaries')
+        # Initialize DocumentSelector (same collection, partition 'summaries')
         self.document_selector = DocumentSelector(
             dbname=config.milvus.dbname,
             collection_name=config.collection_name,
@@ -53,7 +67,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
             port=config.milvus.port
         )
         
-        # Initialize MetadataSelector (misma colección, partición 'summaries')
+        # Initialize MetadataSelector (same collection, partition 'summaries')
         self.metadata_selector = MetadataSelector(
             dbname=config.milvus.dbname,
             collection_name=config.collection_name,
@@ -89,9 +103,9 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
         3. Searches within selected documents applying metadata filters
         
         Args:
-            query: Texto de la consulta. Usado para selección, metadata y para generar embedding.
+            query: Query text. Used for selection, metadata and to generate embedding.
             partition_names: Ignored, will be overridden by selected documents.
-            filter_expr: Opcional. Si se proporciona, se combina con los filtros extraídos.
+            filter_expr: Optional. If provided, it is combined with the extracted filters.
             
         Returns:
             List[Dict[str, Any]]: Search results from selected documents with filters applied.
@@ -110,20 +124,11 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
             selected_file_ids = self.document_selector.run(user_query=query)
             
             if not selected_file_ids:
-                #meter en una funcion y devolver que el sistema no detecto ningun documento relevante?
                 self.logger.warning(
-                    "No documents selected by LLM, returning empty results",
+                    "No documents selected by LLM, returning no-documents message",
                     extra={"user_query": query}
                 )
-                return []
-            
-            self.logger.info(
-                "Documents selected",
-                extra={
-                    "selected_count": len(selected_file_ids),
-                    "selected_file_ids": selected_file_ids
-                }
-            )
+                return [NO_DOCUMENTS_CHUNK.copy()]
             
             # Step 2: Extract metadata and build filters for each document
             self.logger.info("Step 2: Extracting metadata and building filters")
@@ -265,23 +270,24 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 exc_info=True
             )
             raise
-        # No llamar a searcher.disconnect() aquí: comparte la conexión con SummaryRetriever/MetadataSelector.
-        # La colección se libera al cerrar la estrategia en close().
-    
+        # Do not call searcher.disconnect() here: it shares the connection with SummaryRetriever/MetadataSelector.
+        # The collection is released when closing the strategy in close().
+
     def close(self) -> None:
         """
         Closes connections with Milvus and document selector.
+        First the searcher is released; then the selectors (which close the shared connection).
         """
         self.logger.info("Closing DocumentSelectorMetadataSearchStrategy connections")
         try:
-            if self.document_selector is not None:
-                self.document_selector.close()
-            if self.metadata_selector is not None:
-                self.metadata_selector.close()
             try:
                 self.searcher.disconnect()
             except Exception as e:
                 self.logger.warning(f"Error releasing searcher: {str(e)}")
+            if self.document_selector is not None:
+                self.document_selector.close()
+            if self.metadata_selector is not None:
+                self.metadata_selector.close()
             self.logger.info("DocumentSelectorMetadataSearchStrategy closed successfully")
         except Exception as e:
             self.logger.error(

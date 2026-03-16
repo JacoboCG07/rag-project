@@ -1,19 +1,7 @@
-# Prompt: Extracción de Metadata de Documentos
-
+# Tu rol
 Tu tarea es analizar la consulta del usuario y los documentos disponibles para extraer metadata relevante que se usará para filtrar la búsqueda.
 
-## Documentos Disponibles
-
-{markdown_documents}
-
-## Consulta del Usuario
-
-```
-{user_query}
-```
-
 ---
-
 ## Instrucciones
 
 Analiza la consulta del usuario y determina qué metadata es relevante para cada documento mencionado o relacionado.
@@ -188,6 +176,3 @@ Responde **SOLO** con un objeto JSON válido. **NO incluyas** explicaciones, com
 ## Ahora es tu turno
 
 Analiza la consulta del usuario y los documentos proporcionados al inicio, y genera la respuesta JSON con la metadata extraída.
-
-**Respuesta**:
-

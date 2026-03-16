@@ -34,7 +34,7 @@ llm_chooser_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(llm_chooser_module)
 LLMDocumentChooser = llm_chooser_module.LLMDocumentChooser
 
-from llms.text.openai_text_model import OpenAITextModel, OPENAI_AVAILABLE
+from src.llms.text.openai_text_model import OpenAITextModel, OPENAI_AVAILABLE
 
 
 # Skip all tests if OpenAI package is not available
@@ -128,9 +128,142 @@ def sample_markdown(sample_summaries):
     formatter_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(formatter_module)
     MarkdownGenerator = formatter_module.MarkdownGenerator
-    
+
     generator = MarkdownGenerator()
     return generator.generate_all_documents_markdown(sample_summaries)
+
+
+# IDs y datos del escenario CV recruitment (propuesta + 4 CVs)
+JOB_PROPOSAL_ID = "9b88a532626e4e2efdc76cbe0e97b1c1"
+CV_CANDIDATE_1_ID = "dd05cabc39f2920568d6e34fec7c3639"
+CV_CANDIDATE_2_ID = "4a8bc89a3d3308679cc0fe7a93042048"
+CV_CANDIDATE_3_ID = "7f0d024740a44d675d9604f3dbf26b62"
+CV_CANDIDATE_4_ID = "3d3d62350b58ad272721a90822a20edc"
+
+
+@pytest.fixture
+def cv_recruitment_summaries():
+    """Summaries para el escenario de reclutamiento: 1 propuesta + 4 CVs."""
+    return [
+        {
+            "file_id": JOB_PROPOSAL_ID,
+            "file_name": "summary_job_proposal.pdf",
+            "file_type": "PDF",
+            "pages": "1",
+            "chapters": "false",
+            "full_images": "0",
+            "text": "Propuesta de trabajo Desarrollador Backend Python, Madrid, requisitos técnicos."
+        },
+        {
+            "file_id": CV_CANDIDATE_1_ID,
+            "file_name": "summary_cv_candidate_1.pdf",
+            "file_type": "PDF",
+            "pages": "1",
+            "chapters": "false",
+            "full_images": "0",
+            "text": "CV Alberto Ruiz Martínez, desarrollador backend Python."
+        },
+        {
+            "file_id": CV_CANDIDATE_2_ID,
+            "file_name": "summary_cv_candidate_2.pdf",
+            "file_type": "PDF",
+            "pages": "1",
+            "chapters": "false",
+            "full_images": "0",
+            "text": "CV Carlos Méndez Ortega, área comercial y ventas."
+        },
+        {
+            "file_id": CV_CANDIDATE_3_ID,
+            "file_name": "summary_cv_candidate_3.pdf",
+            "file_type": "PDF",
+            "pages": "1",
+            "chapters": "false",
+            "full_images": "0",
+            "text": "CV Laura Fernández Gómez, desarrolladora frontend."
+        },
+        {
+            "file_id": CV_CANDIDATE_4_ID,
+            "file_name": "summary_cv_candidate_4.pdf",
+            "file_type": "PDF",
+            "pages": "1",
+            "chapters": "false",
+            "full_images": "0",
+            "text": "CV Manuel García López, desarrollador backend senior."
+        },
+    ]
+
+
+@pytest.fixture
+def cv_recruitment_markdown():
+    """Markdown de documentos para el escenario CV recruitment (propuesta + 4 CVs)."""
+    return """# 📚 Biblioteca de Documentos
+
+Total de documentos: **5**
+
+---
+## 📄 summary_job_proposal.pdf
+
+- **ID:** `9b88a532626e4e2efdc76cbe0e97b1c1`
+- **Tipo:** PDF
+- **Capítulos:** false
+- **Páginas:** 1
+- **Imágenes:** 0
+
+### Descripción:
+**Tema Principal**: La oferta de empleo para un Desarrollador Backend especializado en Python.
+
+**Descripción del Contenido**: El documento es una propuesta de trabajo que detalla una vacante para un Desarrollador Backend con experiencia en Python, ubicada en Madrid con modalidad híbrida. Se especifican las responsabilidades del puesto, que incluyen el desarrollo y mantenimiento de servicios backend, diseño de APIs REST, y trabajo con bases de datos relacionales y NoSQL. También se mencionan los requisitos técnicos obligatorios y valorables, como el manejo de Django, FastAPI, y experiencia en entornos cloud.
+
+---
+## 📄 summary_cv_candidate_1.pdf
+
+- **ID:** `dd05cabc39f2920568d6e34fec7c3639`
+- **Tipo:** PDF
+- **Capítulos:** false
+- **Páginas:** 1
+- **Imágenes:** 0
+
+### Descripción:
+**Tema Principal**: CV de Alberto Ruiz Martínez, desarrollador backend junior/mid con experiencia en Python.
+
+---
+## 📄 summary_cv_candidate_2.pdf
+
+- **ID:** `4a8bc89a3d3308679cc0fe7a93042048`
+- **Tipo:** PDF
+- **Capítulos:** false
+- **Páginas:** 1
+- **Imágenes:** 0
+
+### Descripción:
+**Tema Principal**: CV de Carlos Méndez Ortega, profesional del área comercial con experiencia en ventas.
+
+---
+## 📄 summary_cv_candidate_3.pdf
+
+- **ID:** `7f0d024740a44d675d9604f3dbf26b62`
+- **Tipo:** PDF
+- **Capítulos:** false
+- **Páginas:** 1
+- **Imágenes:** 0
+
+### Descripción:
+**Tema Principal**: CV de Laura Fernández Gómez, desarrolladora frontend con experiencia en interfaces web.
+
+---
+## 📄 summary_cv_candidate_4.pdf
+
+- **ID:** `3d3d62350b58ad272721a90822a20edc`
+- **Tipo:** PDF
+- **Capítulos:** false
+- **Páginas:** 1
+- **Imágenes:** 0
+
+### Descripción:
+**Tema Principal**: CV de Manuel García López, desarrollador backend senior especializado en Python.
+
+---
+"""
 
 
 @pytest.mark.functional
@@ -318,50 +451,84 @@ class TestLLMDocumentChooserFunctional:
         
         assert isinstance(selected_ids, list)
         assert len(selected_ids) > 0
-    
+
+    def test_choose_documents_cv_recruitment_evaluate_all_candidates(
+        self, llm_chooser, cv_recruitment_markdown, cv_recruitment_summaries
+    ):
+        """Test selección con consulta de evaluar todos los candidatos según la propuesta.
+        El chooser debe incluir la propuesta de trabajo y los 4 CVs."""
+        user_query = (
+            "Evalua absolutamente todos los candidatos teniendo en cuenta los requisitos técnicos "
+            "de la propuesta de trabajo y ponles una nota de 0 a 10, y luego ordénalos de mayor a menor nota."
+        )
+        selected_ids = llm_chooser.choose_documents(
+            markdown_descriptions=cv_recruitment_markdown,
+            user_query=user_query,
+            summaries=cv_recruitment_summaries,
+        )
+        valid_ids = {s["file_id"] for s in cv_recruitment_summaries}
+        assert isinstance(selected_ids, list), "Debe devolver una lista de IDs"
+        assert len(selected_ids) > 0, "Debe seleccionar al menos un documento"
+        for sid in selected_ids:
+            assert sid in valid_ids, f"ID seleccionado {sid} no está en los documentos disponibles"
+        # Debe incluir la propuesta (requisitos del puesto)
+        assert JOB_PROPOSAL_ID in selected_ids, (
+            "La consulta pide evaluar según la propuesta: debe incluir el documento de la propuesta de trabajo"
+        )
+        # Debe incluir al menos 2 CVs (el modelo puede excluir CVs claramente no relevantes, pero debe incluir varios)
+        cv_ids = {CV_CANDIDATE_1_ID, CV_CANDIDATE_2_ID, CV_CANDIDATE_3_ID, CV_CANDIDATE_4_ID}
+        selected_cvs = cv_ids & set(selected_ids)
+        assert len(selected_cvs) >= 2, (
+            f"La consulta pide evaluar candidatos: debe incluir al menos 2 CVs (seleccionados: {selected_cvs})"
+        )
+
     def test_parse_response_with_valid_ids(self, llm_chooser, sample_summaries):
         """Test parsing LLM response with valid file IDs"""
         # Simulate LLM response with valid IDs
         response = "doc_001, doc_002, doc_003"
         
-        selected_ids = llm_chooser._parse_response(response, sample_summaries)
+        selected_ids, think = llm_chooser._parse_response(response, sample_summaries)
         
         assert isinstance(selected_ids, list)
         assert len(selected_ids) == 3
         assert "doc_001" in selected_ids
         assert "doc_002" in selected_ids
         assert "doc_003" in selected_ids
+        assert isinstance(think, str)
     
     def test_parse_response_with_invalid_ids(self, llm_chooser, sample_summaries):
         """Test parsing LLM response with invalid file IDs"""
         # Simulate LLM response with invalid IDs
         response = "invalid_id_1, invalid_id_2, doc_001"
         
-        selected_ids = llm_chooser._parse_response(response, sample_summaries)
+        selected_ids, think = llm_chooser._parse_response(response, sample_summaries)
         
         # Should only return valid IDs
         assert isinstance(selected_ids, list)
         assert "doc_001" in selected_ids
         assert "invalid_id_1" not in selected_ids
         assert "invalid_id_2" not in selected_ids
+        assert isinstance(think, str)
     
     def test_parse_response_with_newlines(self, llm_chooser, sample_summaries):
         """Test parsing LLM response with newline-separated IDs"""
         response = "doc_001\ndoc_002\ndoc_003"
         
-        selected_ids = llm_chooser._parse_response(response, sample_summaries)
+        selected_ids, think = llm_chooser._parse_response(response, sample_summaries)
         
         assert isinstance(selected_ids, list)
         assert len(selected_ids) == 3
+        assert isinstance(think, str)
     
     def test_parse_response_empty_response(self, llm_chooser, sample_summaries):
         """Test parsing empty LLM response"""
         response = ""
         
-        selected_ids = llm_chooser._parse_response(response, sample_summaries)
+        selected_ids, think = llm_chooser._parse_response(response, sample_summaries)
         
         assert isinstance(selected_ids, list)
         assert len(selected_ids) == 0
+        assert think == ""
     
     def test_get_chooser_prompt_structure(self, sample_markdown):
         """Test that prompt structure is correct"""
@@ -377,4 +544,3 @@ class TestLLMDocumentChooserFunctional:
         assert user_query in prompt
         assert "Documentos disponibles" in prompt
         assert len(system_prompt) > 0
-

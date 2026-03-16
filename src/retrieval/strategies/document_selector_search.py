@@ -6,6 +6,19 @@ from typing import List, Dict, Any, Optional
 from .base import SearchStrategy
 from src.retrieval.milvus import MilvusSearcher
 from src.retrieval.document_selection import DocumentSelector
+NO_DOCUMENTS_MESSAGE = "Lo siento, el sistema no encontró ningún documento relevante para esa query."
+
+NO_DOCUMENTS_CHUNK = {
+    "id": 0,
+    "score": 0.0,
+    "text": NO_DOCUMENTS_MESSAGE,
+    "file_id": "",
+    "file_name": "",
+    "source_id": "",
+    "pages": "",
+    "chapters": "",
+    "file_type": "",
+}
 
 
 class DocumentSelectorSearchStrategy(SearchStrategy):
@@ -90,18 +103,10 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
             
             if not selected_file_ids:
                 self.logger.warning(
-                    "No documents selected by LLM, returning empty results",
+                    "No documents selected by LLM, returning no-documents message",
                     extra={"user_query": query}
                 )
-                return []
-            
-            self.logger.info(
-                "Documents selected",
-                extra={
-                    "selected_count": len(selected_file_ids),
-                    "selected_file_ids": selected_file_ids
-                }
-            )
+                return [NO_DOCUMENTS_CHUNK.copy()]
             
             # Step 2: Generate embedding and search in selected documents
             self.logger.info("Step 2: Generating query embedding and searching in selected documents")
@@ -171,16 +176,20 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
     def close(self) -> None:
         """
         Closes connections with Milvus and document selector.
+        Primero se libera el searcher (mientras la conexión sigue viva); después se cierra
+        el document_selector, que cierra la conexión compartida. Si se hiciera al revés,
+        searcher.disconnect() fallaría con ConnectionNotExistException.
         """
         self.logger.info("Closing DocumentSelectorSearchStrategy connections")
         try:
-            if self.document_selector is not None:
-                self.document_selector.close()
-            # Liberar colección del searcher al cerrar (no desconectar: el retriever ya cerró la conexión)
+            # Primero: liberar colección del searcher (la conexión sigue abierta)
             try:
                 self.searcher.disconnect()
             except Exception as e:
                 self.logger.warning(f"Error releasing searcher: {str(e)}")
+            # Después: cerrar document_selector (cierra la conexión Milvus compartida)
+            if self.document_selector is not None:
+                self.document_selector.close()
             self.logger.info("DocumentSelectorSearchStrategy closed successfully")
         except Exception as e:
             self.logger.error(

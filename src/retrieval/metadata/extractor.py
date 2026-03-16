@@ -7,6 +7,7 @@ from src.llms.text import BaseTextModel
 from src.utils import get_logger
 import json
 import os
+import re
 
 
 class MetadataExtractor:
@@ -97,7 +98,7 @@ class MetadataExtractor:
                 }
             }
         """
-        self.logger.info(
+        self.logger.debug(
             "Extracting metadata from documents",
             extra={
                 "user_query": user_query,
@@ -116,6 +117,15 @@ class MetadataExtractor:
                 system_prompt=system_prompt,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature
+            )
+
+            self.logger.info(
+                "Metadata extraction prompts and response",
+                extra={
+                    "system_prompt": system_prompt,
+                    "prompt": prompt,
+                    "response": response,
+                }
             )
             
             # Parsear respuesta
@@ -171,6 +181,61 @@ class MetadataExtractor:
 """
         return prompt, system_prompt
     
+    def _normalize_response(self, response: Any) -> str:
+        """Asegura que response sea un string no None para evitar JSONDecodeError en vacío."""
+        if response is None:
+            return ""
+        if not isinstance(response, str):
+            return str(response) if response else ""
+        return response
+
+    def _extract_json_from_markdown(self, text: str) -> Optional[str]:
+        """
+        Intenta extraer un bloque JSON de markdown (```json ... ``` o ``` ... ```).
+        Muchos LLMs envuelven el JSON en bloques de código.
+        """
+        if not text or not text.strip():
+            return None
+        text = text.strip()
+        # ```json ... ``` (case insensitive)
+        match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL | re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        # Buscar primer { hasta último } por si no hay backticks
+        start = text.find("{")
+        if start != -1:
+            depth = 0
+            for i in range(start, len(text)):
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : i + 1]
+        return None
+
+    def _default_metadata_dict(
+        self, documents_info: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Construye metadata por defecto (sin filtros) para cada documento cuando
+        el LLM no devuelve JSON válido. Así la búsqueda sigue por file_id.
+        """
+        result = {}
+        for doc in documents_info:
+            file_id = doc.get("file_id") if isinstance(doc, dict) else getattr(doc, "file_id", None)
+            file_type = doc.get("file_type") if isinstance(doc, dict) else getattr(doc, "file_type", "PDF")
+            if file_id is None:
+                continue
+            result[str(file_id)] = {
+                "pages": None,
+                "chapters": None,
+                "search_image": False,
+                "num_image": None,
+                "file_type": file_type or "PDF",
+            }
+        return result
+
     def _parse_response(
         self,
         response: str,
@@ -178,24 +243,49 @@ class MetadataExtractor:
     ) -> Dict[str, Dict[str, Any]]:
         """
         Parsea la respuesta del LLM y valida los datos.
-        
-        Args:
-            response: Respuesta del LLM (JSON string).
-            documents_info: Info de documentos para validación.
-        
-        Returns:
-            Dict[str, Dict]: Metadata parseada y validada.
+        Si la respuesta está vacía o no es JSON válido, devuelve metadata por defecto
+        para cada documento (solo file_id/file_type) para no romper el flujo.
         """
+        raw = self._normalize_response(response)
+        text = raw.strip()
+
+        if not text:
+            self.logger.warning(
+                "LLM returned empty response for metadata extraction; using default metadata per document"
+            )
+            return self._default_metadata_dict(documents_info)
+
         try:
-            metadata_dict = json.loads(response)
-            return metadata_dict
-            
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
-            return {}
-        except Exception as e:
-            self.logger.error(f"Error parsing response: {str(e)}")
-            return {}
+            metadata_dict = json.loads(text)
+            if isinstance(metadata_dict, dict):
+                return metadata_dict
+            self.logger.warning(
+                "LLM response JSON is not an object; using default metadata",
+                extra={"response_preview": text[:300]}
+            )
+            return self._default_metadata_dict(documents_info)
+        except json.JSONDecodeError:
+            pass
+
+        # Intentar extraer JSON de bloques ```json ... ```
+        extracted = self._extract_json_from_markdown(raw)
+        if extracted:
+            try:
+                metadata_dict = json.loads(extracted)
+                if isinstance(metadata_dict, dict):
+                    self.logger.info("Parsed JSON from markdown code block")
+                    return metadata_dict
+            except json.JSONDecodeError:
+                pass
+
+        self.logger.error(
+            "Failed to parse LLM response as JSON; using default metadata per document",
+            extra={
+                "response_preview": raw[:500] if raw else "(empty)",
+                "documents_count": len(documents_info)
+            }
+        )
+        return self._default_metadata_dict(documents_info)
     
     def _validate_metadata(
         self,
