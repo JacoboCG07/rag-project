@@ -18,7 +18,7 @@ def build_summary_insert_dict(
     file_type: str,
     file_name: str,
     num_pages: int = 0,
-    has_chapters: bool = False,
+    chapters: str = "",
     num_images: int = 0,
 ) -> MilvusInsertDTO:
     """
@@ -32,7 +32,8 @@ def build_summary_insert_dict(
         file_type: File type (e.g. summary_pdf).
         file_name: File name (e.g. summary_document.pdf).
         num_pages: Number of pages in the document.
-        has_chapters: Whether the document has chapters.
+        chapters: Lista de capítulos con nombres (ej: "capitulo 1, capitulo 2, capitulo 3").
+                  Vacío si no hay capítulos.
         num_images: Number of images in the document.
 
     Returns:
@@ -40,7 +41,7 @@ def build_summary_insert_dict(
     """
     date = datetime.now().date().strftime("%Y-%m-%d")
     pages = str(num_pages)
-    chapters = "true" if has_chapters else "false"
+    chapters_str = chapters[:500] if chapters else ""  # schema max_length=500
     full_images = str(num_images)
     return {
         "file_id": file_id,
@@ -49,7 +50,7 @@ def build_summary_insert_dict(
         "text": summary,
         "text_embedding": text_embedding,
         "pages": pages,
-        "chapters": chapters,
+        "chapters": chapters_str,
         "image_number": "",
         "image_number_in_page": "",
         "full_images": full_images,

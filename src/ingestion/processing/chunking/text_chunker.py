@@ -294,6 +294,33 @@ class TextChunker(BaseChunker):
         return chapters
 
     @staticmethod
+    def extract_all_chapter_names(texts: List[str]) -> List[str]:
+        """
+        Extrae todos los nombres de capítulos únicos del documento, en orden de aparición.
+        Útil para registrar la lista completa en el chunk de resumen.
+
+        Args:
+            texts: Lista de textos (páginas) del documento.
+
+        Returns:
+            List[str]: Lista de nombres de capítulos únicos en orden.
+        """
+        seen: set = set()
+        result: List[str] = []
+        for text in texts:
+            if not text:
+                continue
+            for line in text.split("\n"):
+                if TextChunker._is_chapter_start(line=line):
+                    name = line.strip()
+                    if len(name) > 500:
+                        name = name[:500]
+                    if name and name not in seen:
+                        seen.add(name)
+                        result.append(name)
+        return result
+
+    @staticmethod
     def _is_chapter_start(*, line: str) -> bool:
         """
         Checks if a line is the start of a chapter.
@@ -308,8 +335,9 @@ class TextChunker(BaseChunker):
         if not line_stripped:
             return False
 
-        # Check for "capítulo" (case insensitive)
-        if line_stripped.lower().startswith("capítulo"):
+        # Check for "capítulo" or "capitulo" (case insensitive)
+        lower = line_stripped.lower()
+        if lower.startswith("capítulo") or lower.startswith("capitulo"):
             return True
 
         # Check for Roman numerals (I, II, III, IV, V, etc.)

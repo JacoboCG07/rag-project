@@ -10,6 +10,7 @@ from src.utils import get_logger
 from ...types import ExtractionResult
 from ..milvus.milvus_client import MilvusClient
 from ..preparers.summary_preparer import SummaryPreparer
+from ..chunking.text_chunker import TextChunker
 
 class SummaryUploader:
     """
@@ -83,10 +84,13 @@ class SummaryUploader:
                 self.logger.error("content must be a non-empty list of texts")
                 raise ValueError("content must be a non-empty list of texts")
 
-            # Get file_name, file_type and has_chapters from metadata
+            # Get file_name, file_type from metadata
             file_name = metadata_obj.file_name
             file_type = metadata_obj.file_type if hasattr(metadata_obj, 'file_type') else 'document'
-            has_chapters = bool(getattr(metadata_obj, 'chapters', False))
+
+            # Extraer todos los nombres de capítulos del contenido (capitulo 1, capitulo 2, ...)
+            chapter_names = TextChunker.extract_all_chapter_names(texts=content)
+            chapters_str = ", ".join(chapter_names) if chapter_names else ""
 
             num_images = len(images) if images else 0
 
@@ -117,7 +121,7 @@ class SummaryUploader:
                 file_type=file_type,
                 file_name=file_name,
                 num_pages=len(content),
-                has_chapters=has_chapters,
+                chapters_str=chapters_str,
                 num_images=num_images,
                 partition_name=partition_name,
             )
@@ -216,7 +220,7 @@ class SummaryUploader:
         file_type: str,
         file_name: str,
         num_pages: int,
-        has_chapters: bool,
+        chapters_str: str,
         num_images: int,
         partition_name: str,
     ) -> None:
@@ -229,7 +233,7 @@ class SummaryUploader:
             file_type: File type.
             file_name: File name.
             num_pages: Number of pages in the document.
-            has_chapters: Whether the document has chapters detected.
+            chapters_str: Lista de capítulos separados por comas (ej: "capitulo 1, capitulo 2, capitulo 3").
             num_images: Number of images in the document.
             partition_name: Partition name.
         """
@@ -253,7 +257,7 @@ class SummaryUploader:
             "file_type": f"summary_{file_type}",
             "file_name": f"summary_{file_name}",
             "full_pages": num_pages,
-            "chapters": "true" if has_chapters else "false",
+            "chapters": chapters_str,
             "full_images": num_images,
         }
         prepared_dict = SummaryPreparer.prepare(

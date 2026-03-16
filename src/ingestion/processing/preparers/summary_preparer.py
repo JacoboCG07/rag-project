@@ -36,7 +36,7 @@ class SummaryPreparer:
                 - file_type: str (required, typically "summary_<origin_file_type>")
                 - file_name: str (required, typically "summary_<origin_file_name>")
                 - full_pages: int or str (optional, default 0)
-                - chapters: bool or str "true"/"false" (optional, default "false")
+                - chapters: str - lista de capítulos separados por comas (ej: "capitulo 1, capitulo 2")
                 - full_images: int or str (optional, default 0)
 
         Returns:
@@ -79,11 +79,14 @@ class SummaryPreparer:
         file_name = str(metadata['file_name'])
         full_pages_raw = metadata.get('full_pages', 0)
         num_pages = int(full_pages_raw) if full_pages_raw is not None else 0
-        chapters_raw = metadata.get('chapters', 'false')
-        has_chapters = (
-            chapters_raw is True
-            or (isinstance(chapters_raw, str) and chapters_raw.lower() == 'true')
-        )
+        chapters_raw = metadata.get('chapters', '')
+        # chapters: str con nombres (ej: "capitulo 1, capitulo 2"). Compat con legacy "true"/"false" -> vacío
+        if chapters_raw is True or (isinstance(chapters_raw, str) and chapters_raw.lower() == 'true'):
+            chapters_str = ''
+        elif chapters_raw is False or (isinstance(chapters_raw, str) and chapters_raw.lower() == 'false'):
+            chapters_str = ''
+        else:
+            chapters_str = str(chapters_raw).strip() if chapters_raw else ''
         full_images_raw = metadata.get('full_images', 0)
         num_images = int(full_images_raw) if full_images_raw is not None else 0
 
@@ -106,7 +109,7 @@ class SummaryPreparer:
             file_type=file_type,
             file_name=file_name,
             num_pages=num_pages,
-            has_chapters=has_chapters,
+            chapters=chapters_str,
             num_images=num_images,
         )
 
