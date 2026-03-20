@@ -25,7 +25,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
-JOB_ID = "retrieval_example_1"
+JOB_ID = "retrieval_example_3"
 
 
 def setup_pipeline():
@@ -34,7 +34,7 @@ def setup_pipeline():
     # Configurar pipeline con estrategia SIMPLE
     # Usa la misma colección que en upload_documents.py
     config = SearchPipelineConfig(
-        search_type=SearchType.SIMPLE,
+        search_type=SearchType.WITH_SELECTION_AND_METADATA,
         collection_name="principito_imagenes",  # Misma colección que en upload_documents.py
         search_limit=10,
     )
@@ -46,7 +46,7 @@ def run_search_queries():
     """Ejecuta consultas de ejemplo sobre El Principito"""
     
     print("=" * 80)
-    print("PRUEBA 1: BÚSQUEDA SIMPLE - El Principito")
+    print("PRUEBA 1: BÚSQUEDA CON METADATOS - El Principito")
     print("=" * 80)
     print("\nDocumentos en el sistema:")
     print("  - principito.pdf")
@@ -54,11 +54,8 @@ def run_search_queries():
     
     # Queries de ejemplo
     queries = [
-        "¿Qué le pidió el principito al aviador que dibujara?",
-        "¿Dónde aterrizó el aviador?",
-        "¿Qué significa domesticar?",
-        "¿Cómo es el planeta del principito?",
-        "¿Qué hace el zorro con el principito?"
+        "De que trata el capitulo 2",
+        "que personajes salen en el cap 6"
     ]
     
     # Crear pipeline (cada estrategia genera el embedding de la query internamente)

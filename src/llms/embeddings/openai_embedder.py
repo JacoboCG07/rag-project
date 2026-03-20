@@ -138,6 +138,20 @@ class OpenAIEmbedder(BaseEmbedder):
 
             return embedding, token_count
 
+        except KeyError as e:
+            # KeyError('error') occurs when the API returns an error and the client returns
+            # a structure with 'error' key that is not parsed correctly (e.g. invalid API key)
+            self.logger.error(
+                f"Error parsing embeddings response (KeyError): {e}. "
+                "Possible causes: invalid or missing API key, usage limit, network error.",
+                extra={"model": self.model, "error_type": "KeyError"},
+                exc_info=True
+            )
+            raise Exception(
+                "OpenAI API returned an error response. "
+                "Check OPENAI_API_KEY in .env, usage limits, and connectivity. "
+                f"Detail: {e}"
+            ) from e
         except Exception as e:
             error_msg = str(e)
             # Check for rate limit error (429)
