@@ -11,6 +11,7 @@ from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from src.ingestion.processing.summarizer.llm_summarizer import LLMSummarizer
 from src.ingestion.processing.describer.llm_image_describer import LLMImageDescriber
+from src.utils.milvus_partitions import partition_documents, partition_summaries
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ class IngestionPipelineConfig(BaseModel):
     milvus: MilvusConfig = Field(default_factory=MilvusConfig)
     collection_name: str = Field(
         default="default_collection",
-        description="Collection name. Each collection will have two partitions: 'documents' and 'summaries'"
+        description="Collection name. Partitions only via MILVUS_PARTITION_NAME_* (.env)",
     )
     
     # Chunking configuration
@@ -87,6 +88,8 @@ class IngestionPipelineConfig(BaseModel):
             "IngestionPipelineConfig initialized successfully",
             extra={
                 "collection_name": self.collection_name,
+                "partition_documents": partition_documents(),
+                "partition_summaries": partition_summaries(),
                 "embedding_dim": self.embedder.dimensions,
                 "chunk_size": self.chunk_size,
                 "chunk_overlap": self.chunk_overlap,

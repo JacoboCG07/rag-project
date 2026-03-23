@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from .base import SearchStrategy
 from src.retrieval.milvus import MilvusSearcher
 from src.retrieval.document_selection import DocumentSelector
+from src.utils.milvus_partitions import partition_documents, partition_summaries
 NO_DOCUMENTS_MESSAGE = "Lo siento, el sistema no encontró ningún documento relevante para esa query."
 
 NO_DOCUMENTS_CHUNK = {
@@ -59,15 +60,15 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
             uri=config.milvus.uri,
             token=config.milvus.token,
             host=config.milvus.host,
-            port=config.milvus.port
+            port=config.milvus.port,
         )
         
         self.logger.info(
             "DocumentSelectorSearchStrategy initialized",
             extra={
                 "collection_name": config.collection_name,
-                "partition_documents": config.PARTITION_DOCUMENTS,
-                "partition_summaries": config.PARTITION_SUMMARIES,
+                "partition_documents": partition_documents(),
+                "partition_summaries": partition_summaries(),
                 "search_limit": config.search_limit
             }
         )
@@ -75,7 +76,6 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
     def search(
         self,
         query: str,
-        partition_names: Optional[List[str]] = None,
         filter_expr: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -85,7 +85,6 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
         
         Args:
             query: Texto de la consulta. Usado para selección de documentos y para generar embedding.
-            partition_names: Ignored, will be overridden by selected documents.
             filter_expr: Optional filter expression (not used in this strategy).
             
         Returns:
@@ -131,7 +130,7 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
                 partition_results = self.searcher.search(
                     query_embedding=query_embedding,
                     limit=self.config.search_limit * len(selected_file_ids),  # Get more results to cover all documents
-                    partition_names=[self.config.PARTITION_DOCUMENTS],
+                    partition_names=[partition_documents()],
                     filter_expr=filter_expr
                 )
                 all_results.extend(partition_results)

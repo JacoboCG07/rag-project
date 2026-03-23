@@ -66,7 +66,7 @@ class IngestionPipeline:
                 host=config.milvus.host,
                 port=config.milvus.port,
                 chunk_size=config.chunk_size,
-                chunk_overlap=config.chunk_overlap
+                chunk_overlap=config.chunk_overlap,
             )
             self.logger.info("Ingestion Pipeline initialized successfully")
         except Exception as e:
@@ -90,8 +90,8 @@ class IngestionPipeline:
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Processes a single file and inserts it into Milvus.
-        Documents are inserted into the 'documents' partition and summaries into 'summaries'
-        of the collection specified in the configuration.
+        Documents and summaries use partition names from MILVUS_PARTITION_NAME_DOCUMENTS /
+        MILVUS_PARTITION_NAME_SUMMARIES (.env) in the configured collection.
 
         Args:
             file_path: Path to the file to process.

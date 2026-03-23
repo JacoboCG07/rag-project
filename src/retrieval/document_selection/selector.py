@@ -3,7 +3,7 @@ Module for document selection
 Executes: retrieve summaries -> generate markdown -> select with LLM
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from src.llms.text import BaseTextModel
 from src.retrieval.common import SummaryRetriever, MarkdownGenerator
 from .chooser import LLMDocumentChooser
@@ -24,7 +24,7 @@ class DocumentSelector:
         uri: Optional[str] = None,
         token: Optional[str] = None,
         host: Optional[str] = None,
-        port: Optional[str] = None
+        port: Optional[str] = None,
     ):
         """
         Initializes the selector.
@@ -47,7 +47,7 @@ class DocumentSelector:
             uri=uri,
             token=token,
             host=host,
-            port=port
+            port=port,
         )
         
         self.markdown_generator = MarkdownGenerator()
@@ -85,33 +85,6 @@ class DocumentSelector:
         )
         
         return selected_ids
-
-    def run_with_details(self, user_query: str) -> List[Dict[str, Any]]:
-        """
-        Executes selection and returns complete information.
-        
-        Args:
-            user_query: User query.
-            
-        Returns:
-            List[Dict[str, Any]]: List of documents with complete details.
-        """
-        self.logger.info(f"Executing selection with details: {user_query}")
-        
-        # Step 1: Retrieve summaries
-        summaries = self.retriever.get_all_summaries()
-        
-        # Step 2: Generate markdown
-        markdown = self.markdown_generator.generate_all_documents_markdown(summaries)
-        
-        # Step 3: Select with details
-        selected_documents = self.chooser.choose_documents_with_details(
-            markdown_descriptions=markdown,
-            user_query=user_query,
-            summaries=summaries
-        )
-        
-        return selected_documents
 
     def close(self):
         """Closes connection."""

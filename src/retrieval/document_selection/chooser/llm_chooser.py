@@ -250,37 +250,3 @@ class LLMDocumentChooser:
             )
 
         return selected_ids, think
-
-    def choose_documents_with_details(
-        self,
-        markdown_descriptions: str,
-        user_query: str,
-        summaries: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Selects documents and returns complete information.
-
-        Args:
-            markdown_descriptions: Document descriptions in markdown format.
-            user_query: User query or question.
-            summaries: List of dictionaries with document information.
-
-        Returns:
-            List[Dict[str, Any]]: List of dictionaries with complete information of selected documents.
-        """
-        selected_ids = self.choose_documents(markdown_descriptions, user_query, summaries)
-        
-        # Filter summaries to get only selected ones
-        selected_summaries = [
-            summary for summary in summaries 
-            if summary.get("file_id") in selected_ids
-        ]
-        
-        self.logger.info(
-            "Documents selected with details",
-            extra={
-                "selected_count": len(selected_summaries)
-            }
-        )
-        
-        return selected_summaries

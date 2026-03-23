@@ -28,8 +28,7 @@ class SearchStrategy(ABC):
     def search(
         self,
         query: str,
-        partition_names: Optional[List[str]] = None,
-        filter_expr: Optional[str] = None
+        filter_expr: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Performs search according to the strategy.
@@ -37,9 +36,10 @@ class SearchStrategy(ABC):
         Cada estrategia recibe la query en texto y genera el embedding internamente
         cuando lo necesite, permitiendo adaptar o expandir la query si es necesario.
         
+        Los nombres de partición Milvus vienen solo de MILVUS_PARTITION_NAME_* (.env).
+        
         Args:
             query: Texto de la consulta del usuario.
-            partition_names: List of partition names to search in (None = all partitions).
             filter_expr: Optional filter expression (e.g., 'file_id == "123"').
             
         Returns:

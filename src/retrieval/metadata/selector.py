@@ -30,7 +30,7 @@ class MetadataSelector:
         uri: str = None,
         token: str = None,
         host: str = None,
-        port: str = None
+        port: str = None,
     ):
         """
         Initializes the metadata selector.
@@ -55,7 +55,7 @@ class MetadataSelector:
             uri=uri,
             token=token,
             host=host,
-            port=port
+            port=port,
         )
         
         self.markdown_generator = MarkdownGenerator()

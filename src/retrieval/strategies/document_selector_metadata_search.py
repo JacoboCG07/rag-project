@@ -7,6 +7,7 @@ from .base import SearchStrategy
 from src.retrieval.milvus import MilvusSearcher
 from src.retrieval.document_selection import DocumentSelector
 from src.retrieval.metadata import MetadataSelector
+from src.utils.milvus_partitions import partition_documents, partition_summaries
 NO_DOCUMENTS_MESSAGE = "Lo siento, el sistema no encontró ningún documento relevante para esa query."
 
 # Chunk con la misma forma que un resultado de Milvus, para cuando el LLM no selecciona documentos
@@ -64,7 +65,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
             uri=config.milvus.uri,
             token=config.milvus.token,
             host=config.milvus.host,
-            port=config.milvus.port
+            port=config.milvus.port,
         )
         
         # Initialize MetadataSelector (same collection, partition 'summaries')
@@ -77,15 +78,15 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
             uri=config.milvus.uri,
             token=config.milvus.token,
             host=config.milvus.host,
-            port=config.milvus.port
+            port=config.milvus.port,
         )
         
         self.logger.info(
             "DocumentSelectorMetadataSearchStrategy initialized",
             extra={
                 "collection_name": config.collection_name,
-                "partition_documents": config.PARTITION_DOCUMENTS,
-                "partition_summaries": config.PARTITION_SUMMARIES,
+                "partition_documents": partition_documents(),
+                "partition_summaries": partition_summaries(),
                 "search_limit": config.search_limit
             }
         )
@@ -93,7 +94,6 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
     def search(
         self,
         query: str,
-        partition_names: Optional[List[str]] = None,
         filter_expr: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -104,7 +104,6 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
         
         Args:
             query: Query text. Used for selection, metadata and to generate embedding.
-            partition_names: Ignored, will be overridden by selected documents.
             filter_expr: Optional. If provided, it is combined with the extracted filters.
             
         Returns:
@@ -175,7 +174,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                         doc_results = self.searcher.search(
                             query_embedding=query_embedding,
                             limit=self.config.search_limit,  # Limit per document
-                            partition_names=[self.config.PARTITION_DOCUMENTS],
+                            partition_names=[partition_documents()],
                             filter_expr=doc_filter
                         )
                         
@@ -215,7 +214,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                             doc_results = self.searcher.search(
                                 query_embedding=query_embedding,
                                 limit=self.config.search_limit,
-                                partition_names=[self.config.PARTITION_DOCUMENTS],
+                                partition_names=[partition_documents()],
                                 filter_expr=doc_filter
                             )
                             all_results.extend(doc_results)
@@ -238,7 +237,7 @@ class DocumentSelectorMetadataSearchStrategy(SearchStrategy):
                 all_results = self.searcher.search(
                     query_embedding=query_embedding,
                     limit=self.config.search_limit,
-                    partition_names=[self.config.PARTITION_DOCUMENTS],
+                    partition_names=[partition_documents()],
                     filter_expr=combined_filter
                 )
             

@@ -5,6 +5,7 @@ Performs direct vector search in Milvus without document selection
 from typing import List, Dict, Any, Optional
 from .base import SearchStrategy
 from src.retrieval.milvus import MilvusSearcher
+from src.utils.milvus_partitions import partition_documents
 
 
 class SimpleSearchStrategy(SearchStrategy):
@@ -33,7 +34,7 @@ class SimpleSearchStrategy(SearchStrategy):
             "SimpleSearchStrategy initialized",
             extra={
                 "collection": config.collection_name,
-                "partition": config.PARTITION_DOCUMENTS,
+                "partition": partition_documents(),
                 "search_limit": config.search_limit
             }
         )
@@ -41,7 +42,6 @@ class SimpleSearchStrategy(SearchStrategy):
     def search(
         self,
         query: str,
-        partition_names: Optional[List[str]] = None,
         filter_expr: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -49,7 +49,6 @@ class SimpleSearchStrategy(SearchStrategy):
         
         Args:
             query: Texto de la consulta. Se convierte a embedding internamente.
-            partition_names: List of partition names to search in.
             filter_expr: Optional filter expression.
             
         Returns:
@@ -60,7 +59,6 @@ class SimpleSearchStrategy(SearchStrategy):
         self.logger.info(
             "Executing simple search",
             extra={
-                "has_partition_names": partition_names is not None,
                 "has_filter_expr": filter_expr is not None
             }
         )
@@ -69,15 +67,10 @@ class SimpleSearchStrategy(SearchStrategy):
             # Connect to Milvus
             self.searcher.connect()
             
-            # Perform search
-            # Si no se especifican particiones, buscar en la partición 'documents' por defecto
-            if partition_names is None:
-                partition_names = [self.config.PARTITION_DOCUMENTS]
-            
             results = self.searcher.search(
                 query_embedding=query_embedding,
                 limit=self.config.search_limit,
-                partition_names=partition_names,
+                partition_names=[partition_documents()],
                 filter_expr=filter_expr
             )
             

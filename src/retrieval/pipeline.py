@@ -4,6 +4,7 @@ Executes search operations using different strategies
 """
 from typing import List, Dict, Any, Optional
 from src.retrieval.config import SearchPipelineConfig, SearchType
+from src.utils.milvus_partitions import partition_documents, partition_summaries
 from src.retrieval.strategies import (
     SearchStrategy,
     SimpleSearchStrategy,
@@ -43,8 +44,8 @@ class SearchPipeline:
                 "search_type": config.search_type.value,
                 "milvus_db": config.milvus.dbname,
                 "collection_name": config.collection_name,
-                "partition_documents": config.PARTITION_DOCUMENTS,
-                "partition_summaries": config.PARTITION_SUMMARIES,
+                "partition_documents": partition_documents(),
+                "partition_summaries": partition_summaries(),
                 "search_limit": config.search_limit
             }
         )
@@ -84,7 +85,6 @@ class SearchPipeline:
     def search(
         self,
         query: str,
-        partition_names: Optional[List[str]] = None,
         filter_expr: Optional[str] = None,
         job_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -94,9 +94,10 @@ class SearchPipeline:
         Cada estrategia recibe la query en texto y genera el embedding internamente,
         permitiendo adaptar, expandir o reescribir la query antes de embeder.
         
+        Los nombres de partición Milvus solo se leen de MILVUS_PARTITION_NAME_* (.env).
+        
         Args:
             query: Texto de la consulta del usuario. La estrategia lo convierte a embedding.
-            partition_names: List of partition names to search in (None = all partitions).
             filter_expr: Optional filter expression (e.g., 'file_id == "123"').
             job_id: Optional job identifier for tracking logs. If provided, will be included in all logs.
             
@@ -114,7 +115,6 @@ class SearchPipeline:
                 extra={
                     "search_type": self.config.search_type.value,
                     "strategy": self.strategy.__class__.__name__,
-                    "has_partition_names": partition_names is not None,
                     "has_filter_expr": filter_expr is not None
                 }
             )
@@ -122,7 +122,6 @@ class SearchPipeline:
             # Delegate to the strategy (cada estrategia genera el embedding internamente)
             return self.strategy.search(
                 query=query,
-                partition_names=partition_names,
                 filter_expr=filter_expr
             )
         finally:

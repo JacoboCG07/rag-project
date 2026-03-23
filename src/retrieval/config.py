@@ -11,6 +11,7 @@ from src.utils import get_logger
 from src.llms.text import BaseTextModel, OpenAITextModel
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from src.llms.embeddings.openai_embedder import OpenAIEmbedder
+from src.utils.milvus_partitions import partition_documents, partition_summaries
 
 load_dotenv()
 
@@ -47,11 +48,8 @@ class SearchPipelineConfig(BaseModel):
     milvus: MilvusConfig = Field(default_factory=MilvusConfig)
     collection_name: str = Field(
         default="default_collection",
-        description="Nombre de la colección. Cada colección tiene dos particiones: 'documents' y 'summaries'"
+        description="Nombre de la colección. Particiones solo vía MILVUS_PARTITION_NAME_* (.env)"
     )
-    # Particiones fijas dentro de la colección
-    PARTITION_DOCUMENTS: str = "documents"
-    PARTITION_SUMMARIES: str = "summaries"
     
     # Embedding configuration (para convertir query a embedding internamente)
     embedder: OpenAIEmbedder = Field(
@@ -111,8 +109,8 @@ class SearchPipelineConfig(BaseModel):
             extra={
                 "search_type": self.search_type.value,
                 "collection_name": self.collection_name,
-                "partition_documents": self.PARTITION_DOCUMENTS,
-                "partition_summaries": self.PARTITION_SUMMARIES,
+                "partition_documents": partition_documents(),
+                "partition_summaries": partition_summaries(),
                 "search_limit": self.search_limit,
                 "has_text_model": self.text_model is not None
             }

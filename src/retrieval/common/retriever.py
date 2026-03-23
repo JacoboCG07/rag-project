@@ -7,6 +7,7 @@ from pymilvus import Collection
 from src.ingestion.processing.milvus.milvus_client import MilvusClient
 from src.retrieval.models import DocumentSummary
 from src.utils import get_logger
+from src.utils.milvus_partitions import partition_summaries
 
 
 class SummaryRetriever:
@@ -25,7 +26,7 @@ class SummaryRetriever:
         uri: Optional[str] = None,
         token: Optional[str] = None,
         host: Optional[str] = None,
-        port: Optional[str] = None
+        port: Optional[str] = None,
     ):
         """
         Initializes the summary retriever.
@@ -42,13 +43,15 @@ class SummaryRetriever:
             port: Milvus port (optional).
         """
         self.logger = get_logger(__name__)
+        self.partition_summaries = partition_summaries()
         
         self.logger.info(
             "Initializing SummaryRetriever",
             extra={
                 "dbname": dbname,
                 "collection_name": collection_name,
-                "alias": alias
+                "alias": alias,
+                "partition_summaries": self.partition_summaries,
             }
         )
 
@@ -95,12 +98,10 @@ class SummaryRetriever:
                 "text"
             ]
             
-            # Query all documents from the 'summaries' partition
-            # Use high limit to get all documents
             results = self.collection.query(
                 expr="id >= 0",  # Condition that includes all records
                 output_fields=output_fields,
-                partition_names=["summaries"],  # Buscar solo en la partición de resúmenes
+                partition_names=[self.partition_summaries],
                 limit=10000  # High limit to get all documents
             )
             
@@ -175,11 +176,10 @@ class SummaryRetriever:
             
             self.logger.debug(f"Querying Milvus with filter: {filter_expr}")
             
-            # Query with filter from the 'summaries' partition
             results = self.collection.query(
                 expr=filter_expr,
                 output_fields=output_fields,
-                partition_names=["summaries"],  # Buscar solo en la partición de resúmenes
+                partition_names=[self.partition_summaries],
                 limit=10000  # High limit to get all matching documents
             )
             

@@ -337,21 +337,21 @@ class TestLLMDocumentChooserFunctional:
         # Should select doc_003 (api_reference) for API query
         assert "doc_003" in selected_ids, "Should select API reference for API query"
     
-    def test_choose_documents_with_details(self, llm_chooser, sample_markdown, sample_summaries):
-        """Test choose_documents_with_details returns complete information"""
+    def test_choose_documents_enriches_to_full_summaries(self, llm_chooser, sample_markdown, sample_summaries):
+        """Tras elegir file_ids, los summaries completos conservan file_id, nombre, tipo y texto."""
         user_query = "Guía de usuario y manuales"
-        
-        selected_docs = llm_chooser.choose_documents_with_details(
+
+        selected_ids = llm_chooser.choose_documents(
             markdown_descriptions=sample_markdown,
             user_query=user_query,
-            summaries=sample_summaries
+            summaries=sample_summaries,
         )
-        
-        # Verify response structure
+        id_set = set(selected_ids)
+        selected_docs = [s for s in sample_summaries if s.get("file_id") in id_set]
+
         assert isinstance(selected_docs, list)
         assert len(selected_docs) > 0
-        
-        # Verify each document has all required fields
+
         for doc in selected_docs:
             assert "file_id" in doc
             assert "file_name" in doc

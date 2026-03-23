@@ -4,6 +4,7 @@ Orchestrates document and summary processing
 """
 
 from src.utils import get_logger
+from src.utils import milvus_partitions
 from .milvus.milvus_client import MilvusClient
 from typing import Any, Optional, Tuple, Callable
 from ..types import ExtractionResult
@@ -31,15 +32,15 @@ class DocumentProcessor:
         host: Optional[str] = None,
         port: Optional[str] = None,
         chunk_size: int = 2000,
-        chunk_overlap: int = 0
+        chunk_overlap: int = 0,
     ):
         """
         Initializes the document processor with Milvus client.
-        Usa una sola colección con dos particiones fijas: 'documents' y 'summaries'.
+        Particiones: MILVUS_PARTITION_NAME_DOCUMENTS y MILVUS_PARTITION_NAME_SUMMARIES (.env).
 
         Args:
             dbname: Database name in Milvus.
-            collection_name: Nombre de la colección. Tendrá dos particiones: 'documents' y 'summaries'.
+            collection_name: Nombre de la colección (particiones vía MILVUS_PARTITION_NAME_* en .env).
             generate_embeddings_func: Function to generate embeddings (must receive text and return embedding).
             generate_summary_func: Function to generate summary (must receive full text and return summary string). Required.
             describe_image_func: Function to describe image (must receive base64 image and return description string). Optional.
@@ -53,8 +54,6 @@ class DocumentProcessor:
             chunk_overlap: Number of characters to overlap between chunks (default 0).
         """
 
-        # Usar una sola colección para documentos y resúmenes
-        # Las particiones fijas serán 'documents' y 'summaries'
         self.milvus_client = MilvusClient(
             dbname=dbname,
             collection_name=collection_name,
@@ -67,9 +66,8 @@ class DocumentProcessor:
             port=port
         )
         
-        # Particiones fijas
-        self.PARTITION_DOCUMENTS = "documents"
-        self.PARTITION_SUMMARIES = "summaries"
+        self.PARTITION_DOCUMENTS = milvus_partitions.partition_documents()
+        self.PARTITION_SUMMARIES = milvus_partitions.partition_summaries()
 
         # Store embedding and summary generation functions
         self.generate_embeddings_func = generate_embeddings_func
@@ -121,8 +119,6 @@ class DocumentProcessor:
         """
         Processes document data and inserts it into Milvus collections.
         Always inserts full documents and generates summaries. Optionally processes images.
-        Usa las particiones fijas 'documents' y 'summaries'.
-
         Args:
             file_id: Unique file ID.
             document_data: ExtractionResult with 'content' (list of texts), 'images' (optional list of ImageData),
