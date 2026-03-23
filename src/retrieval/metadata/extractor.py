@@ -1,6 +1,6 @@
 """
 Metadata Extractor
-Extrae metadata de documentos usando LLM basándose en el query del usuario
+Extracts document metadata using an LLM based on the user query.
 """
 from typing import Dict, List, Any, Optional
 from src.llms.text import BaseTextModel
@@ -12,10 +12,10 @@ import re
 
 class MetadataExtractor:
     """
-    Extrae metadata relevante de documentos usando un LLM.
-    
-    Analiza el query del usuario y el markdown de documentos para identificar
-    metadata específica como páginas, capítulos, imágenes, etc.
+    Extracts relevant metadata from documents using an LLM.
+
+    Analyses the user query and document markdown to identify
+    specific metadata such as pages, chapters, images, etc.
     """
     
     def __init__(
@@ -25,19 +25,19 @@ class MetadataExtractor:
         temperature: float = 0.2
     ):
         """
-        Inicializa el extractor de metadata.
+        Initializes the metadata extractor.
         
         Args:
-            text_model: Modelo LLM para extraer metadata.
-            max_tokens: Tokens máximos para la respuesta del LLM.
-            temperature: Temperatura del LLM (0.0-1.0).
+            text_model: LLM used to extract metadata.
+            max_tokens: Maximum tokens for the LLM response.
+            temperature: LLM temperature (0.0-1.0).
         """
         self.text_model = text_model
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.logger = get_logger(__name__)
         
-        # Cargar prompt
+        # Load prompt template
         self.prompt_template = self._load_prompt()
         
         self.logger.info(
@@ -51,13 +51,13 @@ class MetadataExtractor:
     
     def _load_prompt(self) -> str:
         """
-        Carga el prompt desde el archivo prompt.md.
+        Loads the prompt from prompt.md.
         
         Returns:
-            str: Template del prompt.
+            str: Prompt template.
             
         Raises:
-            FileNotFoundError: Si no se encuentra el archivo prompt.md.
+            FileNotFoundError: If prompt.md is missing.
         """
         prompt_path = os.path.join(os.path.dirname(__file__), "prompt.md")
         try:
@@ -77,17 +77,17 @@ class MetadataExtractor:
         documents_info: List[Dict[str, Any]]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Extrae metadata de los documentos basándose en el query del usuario.
+        Extracts metadata from documents based on the user query.
         
         Args:
-            user_query: Consulta del usuario.
-            markdown_documents: Markdown con información de documentos.
-            documents_info: Lista de diccionarios con info de documentos.
+            user_query: User query.
+            markdown_documents: Markdown describing the documents.
+            documents_info: List of dicts with per-document info.
         
         Returns:
-            Dict[str, Dict]: Metadata extraída por file_id.
+            Dict[str, Dict]: Extracted metadata keyed by file_id.
             
-            Ejemplo:
+            Example:
             {
                 "doc_001": {
                     "pages": [1, 2, 3],
@@ -107,10 +107,10 @@ class MetadataExtractor:
         )
         
         try:
-            # Construir prompt y system_prompt
+            # Build prompt and system_prompt
             prompt, system_prompt = self._build_prompt(user_query, markdown_documents)
             
-            # Llamar al LLM usando call_text_model (igual que LLMDocumentChooser)
+            # Call LLM via call_text_model (same pattern as LLMDocumentChooser)
             self.logger.debug("Calling LLM for metadata extraction")
             response = self.text_model.call_text_model(
                 prompt=prompt,
@@ -128,7 +128,7 @@ class MetadataExtractor:
                 }
             )
             
-            # Parsear respuesta
+            # Parse response
             metadata_dict = self._parse_response(response, documents_info)
             
             self.logger.info(
@@ -154,33 +154,33 @@ class MetadataExtractor:
         markdown_documents: str,
     ) -> tuple[str, str]:
         """
-        Construye el prompt y system_prompt para el LLM.
+        Builds the prompt and system_prompt for the LLM.
         
-        Similar a como lo hace LLMDocumentChooser:
-        - system_prompt: Instrucciones generales (del archivo prompt.md)
-        - prompt: Datos específicos (query + documentos)
+        Same structure as LLMDocumentChooser:
+        - system_prompt: General instructions (from prompt.md)
+        - prompt: Specific data (query + documents)
         
         Args:
-            user_query: Consulta del usuario.
-            markdown_documents: Markdown de documentos.
+            user_query: User query.
+            markdown_documents: Document markdown.
         
         Returns:
             tuple[str, str]: (prompt, system_prompt)
         """
-        # system_prompt: Instrucciones generales del archivo prompt.md
+        # system_prompt: general instructions from prompt.md
         system_prompt = self.prompt_template
         
-        # prompt: Datos específicos (query + documentos)
-        prompt = f"""# Consulta del usuario:
+        # prompt: query + documents
+        prompt = f"""# User query:
 {user_query}
 
-# Documentos disponibles:
+# Available documents:
 {markdown_documents}
 """
         return prompt, system_prompt
     
     def _normalize_response(self, response: Any) -> str:
-        """Asegura que response sea un string no None para evitar JSONDecodeError en vacío."""
+        """Ensures response is a non-None string to avoid JSONDecodeError on empty input."""
         if response is None:
             return ""
         if not isinstance(response, str):
@@ -189,8 +189,8 @@ class MetadataExtractor:
 
     def _extract_json_from_markdown(self, text: str) -> Optional[str]:
         """
-        Intenta extraer un bloque JSON de markdown (```json ... ``` o ``` ... ```).
-        Muchos LLMs envuelven el JSON en bloques de código.
+        Tries to extract a JSON block from markdown (```json ... ``` or ``` ... ```).
+        Many LLMs wrap JSON in fenced code blocks.
         """
         if not text or not text.strip():
             return None
@@ -199,7 +199,7 @@ class MetadataExtractor:
         match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL | re.IGNORECASE)
         if match:
             return match.group(1).strip()
-        # Buscar primer { hasta último } por si no hay backticks
+        # First { to last } if there are no backticks
         start = text.find("{")
         if start != -1:
             depth = 0
@@ -216,8 +216,8 @@ class MetadataExtractor:
         self, documents_info: List[Dict[str, Any]]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Construye metadata por defecto (sin filtros) para cada documento cuando
-        el LLM no devuelve JSON válido. Así la búsqueda sigue por file_id.
+        Builds default metadata (no filters) per document when the LLM returns invalid JSON,
+        so search can still proceed by file_id.
         """
         result = {}
         for doc in documents_info:
@@ -240,9 +240,9 @@ class MetadataExtractor:
         documents_info: List[Dict[str, Any]]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Parsea la respuesta del LLM y valida los datos.
-        Si la respuesta está vacía o no es JSON válido, devuelve metadata por defecto
-        para cada documento (solo file_id/file_type) para no romper el flujo.
+        Parses the LLM response and validates data.
+        If the response is empty or not valid JSON, returns default metadata
+        per document (file_id/file_type only) so the flow does not break.
         """
         raw = self._normalize_response(response)
         text = raw.strip()
@@ -265,7 +265,7 @@ class MetadataExtractor:
         except json.JSONDecodeError:
             pass
 
-        # Intentar extraer JSON de bloques ```json ... ```
+        # Try extracting JSON from ```json ... ``` blocks
         extracted = self._extract_json_from_markdown(raw)
         if extracted:
             try:
@@ -292,20 +292,19 @@ class MetadataExtractor:
         document_info: Dict[str, Any]
     ) -> bool:
         """
-        Valida que la metadata extraída sea consistente con el documento.
+        Validates that extracted metadata is consistent with the document.
         
         Args:
-            file_id: ID del documento.
-            metadata: Metadata extraída.
-            document_info: Información real del documento.
+            file_id: Document id.
+            metadata: Extracted metadata.
+            document_info: Ground-truth document info.
         
         Returns:
-            bool: True si es válida.
+            bool: True if valid.
         """
-        # TODO: Implementar validaciones
-        # - Páginas no excedan total_pages
-        # - Capítulos estén en rango válido
-        # - Imágenes no excedan total_num_image
+        # TODO: Add validations
+        # - pages do not exceed total_pages
+        # - chapters within valid range
+        # - images do not exceed total_num_image
         # - etc.
         return True
-
