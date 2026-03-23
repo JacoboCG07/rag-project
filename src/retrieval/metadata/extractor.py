@@ -108,7 +108,7 @@ class MetadataExtractor:
         
         try:
             # Construir prompt y system_prompt
-            prompt, system_prompt = self._build_prompt(user_query, markdown_documents, documents_info)
+            prompt, system_prompt = self._build_prompt(user_query, markdown_documents)
             
             # Llamar al LLM usando call_text_model (igual que LLMDocumentChooser)
             self.logger.debug("Calling LLM for metadata extraction")
@@ -152,7 +152,6 @@ class MetadataExtractor:
         self,
         user_query: str,
         markdown_documents: str,
-        documents_info: List[Dict[str, Any]]
     ) -> tuple[str, str]:
         """
         Construye el prompt y system_prompt para el LLM.
@@ -164,7 +163,6 @@ class MetadataExtractor:
         Args:
             user_query: Consulta del usuario.
             markdown_documents: Markdown de documentos.
-            documents_info: Información de documentos.
         
         Returns:
             tuple[str, str]: (prompt, system_prompt)
