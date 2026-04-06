@@ -4,7 +4,7 @@ Executes search operations using different strategies
 """
 from typing import List, Dict, Any, Optional
 from src.retrieval.config import SearchPipelineConfig, SearchType
-from src.utils.milvus_partitions import partition_documents, partition_summaries
+from src.milvus.partitions import partition_documents, partition_summaries
 from src.retrieval.strategies import (
     SearchStrategy,
     SimpleSearchStrategy,

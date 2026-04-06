@@ -4,8 +4,8 @@ Orchestrates document and summary processing
 """
 
 from src.utils import get_logger
-from src.utils import milvus_partitions
-from .milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
+from src.milvus.partitions import partition_documents, partition_summaries
 from typing import Any, Optional, Tuple, Callable
 from ..types import ExtractionResult
 from .uploaders import DocumentUploader, SummaryUploader
@@ -66,8 +66,8 @@ class DocumentProcessor:
             port=port
         )
         
-        self.PARTITION_DOCUMENTS = milvus_partitions.partition_documents()
-        self.PARTITION_SUMMARIES = milvus_partitions.partition_summaries()
+        self.PARTITION_DOCUMENTS = partition_documents()
+        self.PARTITION_SUMMARIES = partition_summaries()
 
         # Store embedding and summary generation functions
         self.generate_embeddings_func = generate_embeddings_func

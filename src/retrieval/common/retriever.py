@@ -4,10 +4,10 @@ Module for retrieving document summaries from Milvus
 
 from typing import List, Optional
 from pymilvus import Collection
-from src.ingestion.processing.milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
 from src.retrieval.models import DocumentSummary
 from src.utils import get_logger
-from src.utils.milvus_partitions import partition_summaries
+from src.milvus.partitions import partition_summaries
 
 
 class SummaryRetriever:

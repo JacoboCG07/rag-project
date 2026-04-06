@@ -7,7 +7,7 @@ Same schema as milvus_insert_dto (file_id, file_type, file_name, text, etc.).
 from datetime import datetime
 from typing import Dict, List
 
-from .milvus_insert_dto import MilvusInsertDTO
+from src.milvus.dto import MilvusInsertDTO
 
 
 def build_summary_insert_dict(

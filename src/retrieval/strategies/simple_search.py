@@ -4,8 +4,8 @@ Performs direct vector search in Milvus without document selection
 """
 from typing import List, Dict, Any, Optional
 from .base import SearchStrategy
-from src.retrieval.milvus import MilvusSearcher
-from src.utils.milvus_partitions import partition_documents
+from src.milvus import MilvusSearcher
+from src.milvus.partitions import partition_documents
 
 
 class SimpleSearchStrategy(SearchStrategy):

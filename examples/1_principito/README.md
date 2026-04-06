@@ -1,46 +1,77 @@
 # Prueba 1: El Principito con imágenes
 
-Ejemplo de RAG sobre **El Principito** de Antoine de Saint-Exupéry. Usa un PDF que incluye texto e imágenes, y demuestra todo el flujo: ingestión, retrieval y chatbot.
+Ejemplo de RAG sobre **El Principito**. Los tres scripts llaman por HTTP a los servicios del proyecto (ingesta, retrieval, chatbot).
 
 ## De qué trata
 
-Se indexa `principito.pdf` en Milvus con **extracción de imágenes** activada (`extract_images=True`). El texto se divide en chunks y las imágenes se describen con un modelo de visión. Todo queda en la colección `principito_imagenes`, que tiene dos particiones: `documents` (chunks de texto + descriptores de imágenes) y `summaries` (resúmenes de cada documento).
+Se sube `data/principito.pdf` a la colección **`principito_imagenes`**
 
 ## Archivos
 
 | Archivo | Descripción |
 |---------|-------------|
-| `upload_documents.py` | Ingesta: procesa `principito.pdf`, extrae texto e imágenes, genera embeddings, resúmenes y descripciones, y los indexa en la colección `principito_imagenes`. |
-| `run_retrieval.py` | Búsqueda: consultas vectoriales sobre la colección. Muestra los chunks más relevantes para cada pregunta sin generar respuestas. |
-| `run_chatbot.py` | Chatbot RAG: retrieval + LLM. Recupera contexto y genera respuestas naturales usando el texto e imágenes indexados. |
+| `upload_documents.py` | POST multipart a `/ingest` (servicio puerto **8015**). (Sube el documento)|
+| `run_retrieval.py` | POST JSON a `/search` (servicio puerto **8007**). (Realiza una búsqueda)|
+| `run_chatbot.py` | POST JSON a `/chat` (servicio puerto **8018**). (Realiza una búsqueda y contesta con la información extraída)|
+
+Las URLs base están definidas como constantes al inicio de cada script (`localhost` y los puertos anteriores).
+
+## Variables de entorno del proyecto
+
+Los servicios cargan el `.env` en la raíz del repo (`rag-project/.env`). Variables previstas:
+
+| Variable | Uso |
+|----------|-----|
+| `OPENAI_API_KEY` | API de OpenAI (ingesta/chatbot según configuración). |
+| `MILVUS_HOST` | Host de Milvus. |
+| `MILVUS_PORT` | Puerto de Milvus. |
+| `MILVUS_DB_NAME` | Base de datos en Milvus. |
+| `MILVUS_PARTITION_NAME_DOCUMENTS` | Partición de documentos. |
+| `MILVUS_PARTITION_NAME_SUMMARIES` | Partición de resúmenes. |
+| `MONGO_HOST` | Host de MongoDB (logs / metadatos según el servicio). |
+| `MONGO_PORT` | Puerto de MongoDB. |
+| `MONGO_ROOT_USERNAME` | Usuario root de MongoDB. |
+| `MONGO_ROOT_PASSWORD` | Contraseña root de MongoDB. |
+| `MONGO_DB_NAME` | Nombre de la base de datos. |
+| `MONGO_LOGS_COLLECTION` | Colección de logs. |
+| `MONGO_LOG_LEVEL` | Nivel de log para Mongo u operador de logs. |
+
+Los scripts del ejemplo solo necesitan que los tres servicios estén levantados y el `.env` correcto para los contenedores o procesos del backend.
 
 ## Orden de ejecución
 
-1. **Subir documentos** (primero, solo una vez):
+1. Levantar Milvus y los servicios (o al menos los que vayas a usar):
+
    ```bash
-   python examples/prueba_1/upload_documents.py
+   docker-compose up -d
    ```
 
-2. **Búsqueda** (solo chunks):
+2. **Subir documentos**:
+
    ```bash
-   python examples/prueba_1/run_retrieval.py
+   python examples/1_principito/upload_documents.py
    ```
 
-3. **Chatbot** (retrieval + generación):
+3. **Búsqueda** (solo chunks):
+
    ```bash
-   python examples/prueba_1/run_chatbot.py
+   python examples/1_principito/run_retrieval.py
+   ```
+
+4. **Chatbot**:
+
+   ```bash
+   python examples/1_principito/run_chatbot.py
    ```
 
 ## Requisitos
 
-- Milvus en marcha (`docker-compose up -d`)
-- `.env` con `OPENAI_API_KEY` y configuración de Milvus
-- PDF en `data/principito.pdf`
+- Servicios FastAPI en marcha (o `docker compose` con `ingestion`, `retrieval`, `chatbot`).
+- `.env` en la raíz del repo con los valores anteriores (p. ej. `OPENAI_API_KEY` y Milvus/Mongo) para que los servicios arranquen bien.
+- PDF de ejemplo en `data/principito.pdf`.
 
-## Visualizar la base vectorial (Attu)
-
-Una vez tengas levantado el servicio con `docker-compose up -d` puedes usar **Attu**, la interfaz web para explorar Milvus y ver las colecciones (por ejemplo `principito_imagenes`), particiones y datos indexados.
-
+## Attu
+ (Interfaz web para ver la base de datos y las distintas colecciones de milvus)
 **URL:** http://localhost:8000
 
-En Attu, conecta a Milvus con `localhost:19530` (configuración por defecto del `docker-compose`).
+Conexión a Milvus: `localhost:19530` desde el host.

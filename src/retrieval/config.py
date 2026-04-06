@@ -11,7 +11,7 @@ from src.utils import get_logger
 from src.llms.text import BaseTextModel, OpenAITextModel
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from src.llms.embeddings.openai_embedder import OpenAIEmbedder
-from src.utils.milvus_partitions import partition_documents, partition_summaries
+from src.milvus.partitions import partition_documents, partition_summaries
 
 load_dotenv()
 
@@ -60,8 +60,8 @@ class SearchPipelineConfig(BaseModel):
     # Search parameters
     search_limit: int = Field(
         default=10,
-        ge=1,
-        le=100,
+        ge=5,
+        le=25,
         description="Maximum number of results to return"
     )
     

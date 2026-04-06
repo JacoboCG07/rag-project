@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional, Tuple, Callable
 from src.utils import get_logger
 
 from ...types import ExtractionResult
-from ..milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
 from ..preparers.summary_preparer import SummaryPreparer
 from ..chunking.text_chunker import TextChunker
 

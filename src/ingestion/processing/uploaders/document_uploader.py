@@ -5,7 +5,7 @@ Orchestrates text and image processing and uploading
 
 from typing import Tuple, Callable, Any, Optional
 from src.utils import get_logger
-from ..milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
 from ...types import ExtractionResult
 from .components import TextUploader, ImageUploader
 

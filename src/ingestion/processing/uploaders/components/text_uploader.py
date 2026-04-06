@@ -5,7 +5,7 @@ Handles text processing and insertion to Milvus
 
 from typing import List, Dict, Any, Tuple, Callable
 from ...processors import TextProcessor, ChunkProcessor
-from ...milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
 from ...preparers.document_preparer import DocumentPreparer
 from src.utils import get_logger
 

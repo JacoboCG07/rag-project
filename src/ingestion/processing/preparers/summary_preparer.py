@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List
 from src.utils import get_logger
 
 from .summary_insert_dto import build_summary_insert_dict
-from .milvus_insert_dto import SCHEMA_KEYS
+from src.milvus.dto import SCHEMA_KEYS
 
 
 class SummaryPreparer:

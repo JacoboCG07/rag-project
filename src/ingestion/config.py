@@ -11,7 +11,7 @@ from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from src.ingestion.processing.summarizer.llm_summarizer import LLMSummarizer
 from src.ingestion.processing.describer.llm_image_describer import LLMImageDescriber
-from src.utils.milvus_partitions import partition_documents, partition_summaries
+from src.milvus.partitions import partition_documents, partition_summaries
 
 load_dotenv()
 

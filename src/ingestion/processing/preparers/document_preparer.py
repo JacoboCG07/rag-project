@@ -6,7 +6,7 @@ Prepares document chunks for insertion into Milvus
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from src.utils import get_logger
-from .milvus_insert_dto import SCHEMA_KEYS, build_milvus_insert_dict
+from src.milvus.dto import SCHEMA_KEYS, build_milvus_insert_dict
 
 
 class DocumentPreparer:

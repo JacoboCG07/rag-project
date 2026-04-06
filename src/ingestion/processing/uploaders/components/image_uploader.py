@@ -5,7 +5,7 @@ Handles image processing and insertion to Milvus
 
 from typing import List, Dict, Any, Tuple, Callable, Optional
 from ...processors import ImageProcessor, validate_images_list
-from ...milvus.milvus_client import MilvusClient
+from src.milvus.client import MilvusClient
 from ...preparers.document_preparer import DocumentPreparer
 from src.utils import get_logger
 

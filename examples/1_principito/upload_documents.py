@@ -1,48 +1,57 @@
 """
-Script de Subida de Documentos - Ejemplo 1: CVs y Propuesta de Trabajo
-========================================================================
+Script de Subida de Documentos - Ejemplo 1: El Principito
+=========================================================
 
-Este script indexa los documentos del ejemplo en Milvus usando el RAG Pipeline.
+Indexa los PDF del ejemplo llamando al **servicio HTTP de ingesta** (multipart).
+
+Requisito: servicio de ingesta accesible (por defecto http://localhost:8015).
+Chunk y embedding los define el despliegue del servicio de ingesta.
 
 Documentos a subir:
-- principito.pdf
+- data/principito.pdf
 """
 
+from __future__ import annotations
+
+import io
 import os
+from pickle import TRUE
 import sys
 from pathlib import Path
 
-# Configurar codificación UTF-8 para Windows
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+import httpx
 
-# Añadir el directorio raíz al path para imports
+# Raíz del repo (solo para resolver rutas de datos)
 root_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
-from src.ingestion.ingestion_pipeline import IngestionPipeline
-from src.ingestion.config import IngestionPipelineConfig
-from src.utils import get_logger
+# Configurar codificación UTF-8 para Windows
+if sys.platform == "win32":
+    import io as _io
 
-logger = get_logger(__name__)
+    sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = _io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-JOB_ID = "prueba_11"
-EXTRACT_IMAGES = False
+# 127.0.0.1 evita ambigüedad IPv4/IPv6; trust_env=False evita que HTTP_PROXY rompa localhost.
+INGESTION_BASE_URL = "http://127.0.0.1:8015"
+INGEST_TIMEOUT = 600.0
+EXTRACT_IMAGES = TRUE
 
-def upload_documents():
-    """Sube e indexa todos los documentos del ejemplo en Milvus"""
-    
+COLLECTION_NAME = "principito_imagenes"
+JOB_ID = "upload_documents_1"
+
+def upload_documents() -> None:
+    """Sube cada fichero del ejemplo vía POST /ingest."""
+
     print("=" * 80)
-    print("SUBIDA DE DOCUMENTOS - Pruebas de RAG")
+    print("SUBIDA DE DOCUMENTOS (API de ingesta) - Ejemplo 1")
     print("=" * 80)
-    
+    print(f"Servicio: {INGESTION_BASE_URL}")
+    print("=" * 80)
+
     if EXTRACT_IMAGES:
         print("\n⚠️  EXTRACT_IMAGES está activado (True).")
-        print("   La búsqueda incorporará las imágenes de los documentos.")
-        print("   Esto conlleva más gasto en OpenAI (por cada imagen se hará una descripción).")
-        print("   Si no quieres incorporar las imágenes modifica la variable EXTRACT_IMAGES de este archivo a False.\n")
+        print("   Más gasto en OpenAI (descripciones de imágenes).\n")
         while True:
             respuesta = input("¿Quieres continuar? (s/n): ").strip().lower()
             if respuesta in ("s", "si", "y", "yes"):
@@ -51,99 +60,90 @@ def upload_documents():
                 print("Subida cancelada.")
                 return
             print("Responde 's' para sí o 'n' para no.")
-    
-    # Ruta a la carpeta de datos
+
     data_dir = Path(__file__).parent / "data"
-    
-    # Lista de documentos a procesar
-    expected_files = [
-        "principito_77.pdf",
-    ]
-    
-    # Obtener rutas de los archivos
-    existing_files = [data_dir / filename for filename in expected_files]
-    print(f"\n🚀 Procesando {len(existing_files)} documento(s)...\n")
-    
-    # Nombre de la colección para este ejemplo
-    # La colección tendrá dos particiones: 'documents' y 'summaries'
-    collection_name = "principito_imagenes"
-    
+    expected_files = ["principito.pdf"]
+    missing = [f for f in expected_files if not (data_dir / f).exists()]
+    if missing:
+        print("⚠️  Archivos no encontrados en data/:")
+        for f in missing:
+            print(f"   - {f}")
+        print("\nColoca los PDF en la carpeta 'data/' e intenta de nuevo.\n")
+        return
+
+    existing_files = [data_dir / f for f in expected_files]
+    print(f"\n🚀 Enviando {len(existing_files)} documento(s) al servicio...\n")
+
     try:
-        # Configurar el RAG Pipeline
-        # Opciones: chunk_size, chunk_overlap, extract_images
-        config = IngestionPipelineConfig(
-            collection_name=collection_name,
-            chunk_size=2000,
-            extract_images=EXTRACT_IMAGES,
-        )
-        
-        with IngestionPipeline(config=config) as pipeline:
-            successful = 0
-            failed = 0
-            
-            for i, file_path in enumerate(existing_files, 1):
-                print(f"\n{'─' * 80}")
-                print(f"[{i}/{len(existing_files)}] Procesando: {file_path.name}")
-                print(f"Colección: {collection_name}")
-                print(f"  - Partición documentos: documents")
-                print(f"  - Partición resúmenes: summaries")
-                print('─' * 80)
-                
-                try:
-                    # Procesar e indexar el documento
-                    # Los documentos van a la partición 'documents' y los resúmenes a 'summaries'
-                    success, message, result_info = pipeline.process_single_file(
-                        file_path=str(file_path),
-                        job_id=JOB_ID
-                    )
-                    
-                    if success:
-                        print(f"✓ {file_path.name} procesado correctamente")
-                        print(f"  - File ID: {result_info.get('file_id', 'N/A')}")
-                        print(f"  - Mensaje: {message}")
-                        successful += 1
-                    else:
-                        print(f"✗ Error procesando {file_path.name}: {message}")
-                        failed += 1
-                    
-                except Exception as e:
-                    logger.error(f"Error procesando {file_path.name}: {str(e)}", exc_info=True)
-                    print(f"✗ Error procesando {file_path.name}: {str(e)}")
-                    failed += 1
-            
-            print("\n" + "=" * 80)
-            print("RESUMEN DE SUBIDA")
-            print("=" * 80)
-            print(f"✓ Exitosos: {successful}")
-            print(f"✗ Fallidos: {failed}")
-            print(f"📊 Total procesados: {successful + failed}")
-            
-            if successful > 0:
-                print("\n✅ Los documentos están listos para búsqueda.")
-                print(f"   Colección utilizada: {collection_name}")
-                print(f"   - Partición documentos: documents")
-                print(f"   - Partición resúmenes: summaries")
-                print("   Ejecuta 'python run_retrieval.py' para probar las búsquedas. (devolverá solo los fragmentos de texto similares a la consulta)")
-                print("   Ejecuta 'python run_chatbot.py' para probar el chatbot. (devolverá una respuesta basada en los fragmentos extraidos de la búsqueda)")
-            
+        r = httpx.get(f"{INGESTION_BASE_URL}/health", timeout=10.0, trust_env=False)
+        r.raise_for_status()
     except Exception as e:
-        logger.error(f"Error en el pipeline: {str(e)}", exc_info=True)
-        print(f"\n❌ Error crítico: {str(e)}")
-        print("\nAsegúrate de que:")
-        print("  1. Milvus está corriendo (docker-compose up -d)")
-        print("  2. Las variables de entorno están configuradas (.env)")
-        print("  3. Tienes una API key válida de OpenAI")
+        print(f"❌ No se puede contactar con el servicio de ingesta: {e}")
+        print(f"   ¿Está levantado?  uvicorn services.ingestion.main:app --port 8015")
+        print(f"   o  docker compose up -d ingestion")
+        return
+
+    successful = 0
+    failed = 0
+
+    with httpx.Client(timeout=INGEST_TIMEOUT, trust_env=False) as client:
+        for i, file_path in enumerate(existing_files, 1):
+            print(f"\n{'─' * 80}")
+            print(f"[{i}/{len(existing_files)}] {file_path.name}")
+            print(f"Colección: {COLLECTION_NAME}")
+            print("─" * 80)
+
+            extract_str = "true" if EXTRACT_IMAGES else "false"
+            try:
+                with open(file_path, "rb") as f:
+                    file_content = f.read()
+                files = {
+                    "file": (file_path.name, io.BytesIO(file_content), "application/pdf"),
+                }
+                form = {
+                    "collection_name": COLLECTION_NAME,
+                    "extract_images": extract_str,
+                    "job_id": JOB_ID,
+                }
+                resp = client.post(f"{INGESTION_BASE_URL}/ingest", files=files, data=form)
+                try:
+                    body = resp.json()
+                except Exception:
+                    body = {}
+
+                if resp.status_code != 200:
+                    print(f"✗ HTTP {resp.status_code}: {body.get('detail', resp.text)}")
+                    failed += 1
+                    continue
+
+                if body.get("success"):
+                    print(f"✓ {file_path.name} procesado correctamente")
+                    ri = body.get("result_info") or {}
+                    print(f"  - File ID: {ri.get('file_id', 'N/A')}")
+                    print(f"  - Mensaje: {body.get('message', '')}")
+                    successful += 1
+                else:
+                    print(f"✗ Error: {body.get('message', body)}")
+                    failed += 1
+
+            except Exception as e:
+                print(f"✗ Error: {e}")
+                failed += 1
+
+    print("\n" + "=" * 80)
+    print("RESUMEN DE SUBIDA")
+    print("=" * 80)
+    print(f"✓ Exitosos: {successful}")
+    print(f"✗ Fallidos: {failed}")
+
+    if successful > 0:
+        print("\n✅ Documentos listos para búsqueda.")
+        print(f"   Colección: {COLLECTION_NAME}")
+        print("   Ejecuta: python run_retrieval.py  |  python run_chatbot.py")
 
 
-def main():
-    """Función principal"""
-    
-    print("\n📤 Iniciando subida de documentos para Ejemplo 1: El Principito...\n")
-    
-    # Verificar que Milvus está disponible
-    print("ℹ️  Asegúrate de que Milvus está corriendo:")
-    print("   docker-compose up -d\n")
-    
+def main() -> None:
+    print("\n📤 Subida vía API de ingesta - Ejemplo 1: El Principito\n")
     upload_documents()
 
 

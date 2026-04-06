@@ -74,6 +74,60 @@ services:
     networks:
       - milvus
 
+  retrieval:
+    container_name: rag-retrieval
+    build:
+      context: .
+      dockerfile: Dockerfile.retrieval
+    ports:
+      - "8007:8007"
+    env_file:
+      - .env
+    environment:
+      MILVUS_HOST: standalone
+      MILVUS_PORT: "19530"
+    depends_on:
+      standalone:
+        condition: service_healthy
+    networks:
+      - milvus
+
+  chatbot:
+    container_name: rag-chatbot
+    build:
+      context: .
+      dockerfile: Dockerfile.chatbot
+    ports:
+      - "8018:8018"
+    env_file:
+      - .env
+    environment:
+      MILVUS_HOST: standalone
+      MILVUS_PORT: "19530"
+    depends_on:
+      standalone:
+        condition: service_healthy
+    networks:
+      - milvus
+
+  ingestion:
+    container_name: rag-ingestion
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    ports:
+      - "8015:8015"
+    env_file:
+      - .env
+    environment:
+      MILVUS_HOST: standalone
+      MILVUS_PORT: "19530"
+    depends_on:
+      standalone:
+        condition: service_healthy
+    networks:
+      - milvus
+
   mongodb:
     container_name: mongodb
     image: mongo:7.0

@@ -4,10 +4,10 @@ Selects relevant documents using LLM, then searches with metadata filters
 """
 from typing import List, Dict, Any, Optional
 from .base import SearchStrategy
-from src.retrieval.milvus import MilvusSearcher
+from src.milvus import MilvusSearcher
 from src.retrieval.document_selection import DocumentSelector
 from src.retrieval.metadata import MetadataSelector
-from src.utils.milvus_partitions import partition_documents, partition_summaries
+from src.milvus.partitions import partition_documents, partition_summaries
 NO_DOCUMENTS_MESSAGE = "Lo siento, el sistema no encontró ningún documento relevante para esa query."
 
 # Chunk con la misma forma que un resultado de Milvus, para cuando el LLM no selecciona documentos
