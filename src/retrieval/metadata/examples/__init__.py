@@ -1,4 +1,0 @@
-"""
-Examples for Metadata Module
-"""
-

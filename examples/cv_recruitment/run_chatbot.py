@@ -1,10 +1,10 @@
 """
-Ejemplo 2: Chatbot RAG — Reclutamiento con CVs (vía API chatbot)
-================================================================
+CV Recruitment: RAG Chatbot (via chatbot API)
+=============================================
 
-Llama al servicio HTTP de chat (POST /chat): retrieval con `with_selection` + LLM.
+Calls the HTTP chat service (POST /chat): retrieval with `with_selection` + LLM.
 
-Requisito: servicio chatbot accesible (por defecto http://localhost:8018).
+Requirement: chatbot service accessible (default http://localhost:8018).
 """
 
 from __future__ import annotations
@@ -28,34 +28,34 @@ SEARCH_TYPE = "with_selection"
 SEARCH_LIMIT = 10
 
 COLLECTION_NAME = "cv_recruitment"
-JOB_ID = "chatbot_example_2"
+JOB_ID = "chatbot_example_cv"
 
 
 def main() -> None:
     print("\n" + "=" * 80)
-    print("CHATBOT RAG (API chatbot) - Sistema de Reclutamiento con CVs")
+    print("RAG CHATBOT (chatbot API) - CV Recruitment System")
     print("=" * 80)
-    print(f"Servicio: {CHATBOT_BASE_URL}")
-    print(f"Colección en POST /chat: {COLLECTION_NAME}")
-    print(f"Estrategia: {SEARCH_TYPE}")
+    print(f"Service: {CHATBOT_BASE_URL}")
+    print(f"Collection in POST /chat: {COLLECTION_NAME}")
+    print(f"Strategy: {SEARCH_TYPE}")
     print("=" * 80 + "\n")
 
     try:
         r = httpx.get(f"{CHATBOT_BASE_URL}/health", timeout=10.0)
         r.raise_for_status()
     except Exception as e:
-        print(f"❌ No se puede contactar con el servicio chatbot: {e}")
+        print(f"❌ Cannot reach the chatbot service: {e}")
         return
 
     queries = [
-        "Evalúa los mejores candidatos teniendo en cuenta los requisitos técnicos "
-        "de la propuesta de trabajo y ponles una nota de 0 a 10, y luego ordénalos de mayor a menor nota.",
+        "Evaluate the best candidates based on the technical requirements of the job proposal, "
+        "give each a score from 0 to 10, and rank them from highest to lowest score.",
     ]
 
     with httpx.Client(timeout=180.0) as client:
         for i, query in enumerate(queries, 1):
             print(f"\n{'-' * 80}")
-            print(f"PREGUNTA {i}: {query}")
+            print(f"QUESTION {i}: {query}")
             print("-" * 80)
             try:
                 payload = {
@@ -72,13 +72,13 @@ def main() -> None:
                     continue
                 data = resp.json()
                 answer = data.get("answer", "")
-                print(f"\nRespuesta:\n{answer}\n")
+                print(f"\nAnswer:\n{answer}\n")
             except Exception as e:
-                logger.error("Error en pregunta %s: %s", i, e, exc_info=True)
+                logger.error("Error on question %s: %s", i, e, exc_info=True)
                 print(f"\nError: {e}\n")
 
     print("=" * 80)
-    print("FIN")
+    print("DONE")
     print("=" * 80)
 
 

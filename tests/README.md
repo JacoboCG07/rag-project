@@ -4,11 +4,15 @@ This document explains how to run tests for the RAG Project.
 
 ## Prerequisites
 
-Make sure pytest is installed:
+From the repository root, use a virtual environment (on many Linux distros the system Python blocks plain `pip install`; PEP 668):
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+On **Windows** (PowerShell): `.\.venv\Scripts\Activate.ps1` instead of `source .venv/bin/activate`.
 
 ## Running Tests
 
@@ -130,7 +134,7 @@ pytest tests/ -q
 Generate coverage report (requires pytest-cov):
 
 ```bash
-# Install pytest-cov first
+# Install pytest-cov first (virtualenv activated)
 pip install pytest-cov
 
 # Run with coverage

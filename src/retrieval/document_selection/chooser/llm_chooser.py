@@ -5,6 +5,7 @@ Uses text models to select relevant documents based on user queries
 
 import json
 import re
+from pathlib import Path
 
 from src.utils import get_logger
 from src.llms.text import BaseTextModel
@@ -167,14 +168,13 @@ class LLMDocumentChooser:
         Returns:
             tuple[str, str]: (prompt, system_prompt)
         """
-        system_prompt = PromptLoader.read_file(
-            "src/retrieval/document_selection/chooser/prompt.md"
-        )
+        prompt_path = Path(__file__).parent / "chooser_prompt.md"
+        system_prompt = PromptLoader.read_file(str(prompt_path))
         
-        prompt = f"""# Consulta del usuario:
+        prompt = f"""# User query:
 {user_query}
 
-# Documentos disponibles:
+# Available documents:
 {markdown_descriptions}
 """
         

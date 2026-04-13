@@ -40,7 +40,7 @@ def _get_rag_prompt(user_query: str, context: str) -> tuple[str, str]:
     """
     prompt_path = Path(__file__).parent / "chatbot_prompt.md"
     system_prompt = PromptLoader.read_file(str(prompt_path))
-    prompt = f"## Contexto\n\n{context}\n\n## Pregunta del usuario\n\n{user_query}"
+    prompt = f"## Context\n\n{context}\n\n## User question\n\n{user_query}"
     return prompt, system_prompt
 
 

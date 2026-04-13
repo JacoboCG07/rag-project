@@ -3,8 +3,10 @@ LLM-based image describer implementation
 Uses vision models to generate image descriptions
 """
 
-from src.utils import get_logger
+from pathlib import Path
 from typing import Optional, Union, List
+
+from src.utils import get_logger
 from src.utils.utils import PromptLoader
 from src.llms.vision import BaseVisionModel
 
@@ -139,5 +141,6 @@ class LLMImageDescriber:
         Returns:
             str: Default prompt template for describing images.
         """
-        system_prompt = PromptLoader.read_file("src/ingestion/processing/describer/image_describer_prompt.md")
+        prompt_path = Path(__file__).parent / "image_describer_prompt.md"
+        system_prompt = PromptLoader.read_file(str(prompt_path))
         return system_prompt

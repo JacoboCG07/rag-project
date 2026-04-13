@@ -1,13 +1,13 @@
 """
-Script de Subida de Documentos - Ejemplo 2: CVs y Propuesta de Trabajo
-========================================================================
+Document Upload Script - CV Recruitment Example
+================================================
 
-Indexa los PDF del ejemplo llamando al **servicio HTTP de ingesta** (multipart).
+Indexes the example PDFs by calling the **ingestion HTTP service** (multipart).
 
-Requisito: servicio de ingesta accesible (por defecto http://localhost:8015).
-Chunk y embedding los define el despliegue del servicio de ingesta.
+Requirement: ingestion service accessible (default http://localhost:8015).
+Chunk size and embedding model are defined by the ingestion service deployment.
 
-Documentos a subir:
+Documents to upload:
 - data/job_proposal.pdf
 - data/cv_candidate_1.pdf … cv_candidate_4.pdf
 """
@@ -34,29 +34,29 @@ INGEST_TIMEOUT = 600.0
 EXTRACT_IMAGES = False
 
 COLLECTION_NAME = "cv_recruitment"
-JOB_ID = "upload_documents_2"
+JOB_ID = "upload_documents_cv"
 
 
 def upload_documents() -> None:
-    """Sube cada fichero del ejemplo vía POST /ingest."""
+    """Uploads each example file via POST /ingest."""
 
     print("=" * 80)
-    print("SUBIDA DE DOCUMENTOS (API de ingesta) - Ejemplo 2: CVs")
+    print("DOCUMENT UPLOAD (ingestion API) - CV Recruitment Example")
     print("=" * 80)
-    print(f"Servicio: {INGESTION_BASE_URL}")
+    print(f"Service: {INGESTION_BASE_URL}")
     print("=" * 80)
 
     if EXTRACT_IMAGES:
-        print("\n⚠️  EXTRACT_IMAGES está activado (True).")
-        print("   Más gasto en OpenAI (descripciones de imágenes).\n")
+        print("\n⚠️  EXTRACT_IMAGES is enabled (True).")
+        print("   This will increase OpenAI usage (image descriptions).\n")
         while True:
-            respuesta = input("¿Quieres continuar? (s/n): ").strip().lower()
-            if respuesta in ("s", "si", "y", "yes"):
+            answer = input("Do you want to continue? (y/n): ").strip().lower()
+            if answer in ("y", "yes"):
                 break
-            if respuesta in ("n", "no"):
-                print("Subida cancelada.")
+            if answer in ("n", "no"):
+                print("Upload cancelled.")
                 return
-            print("Responde 's' para sí o 'n' para no.")
+            print("Please answer 'y' for yes or 'n' for no.")
 
     data_dir = Path(__file__).parent / "data"
     expected_files = [
@@ -68,22 +68,22 @@ def upload_documents() -> None:
     ]
     missing = [f for f in expected_files if not (data_dir / f).exists()]
     if missing:
-        print("⚠️  Archivos no encontrados en data/:")
+        print("⚠️  Files not found in data/:")
         for f in missing:
             print(f"   - {f}")
-        print("\nColoca los PDF en la carpeta 'data/' e intenta de nuevo.\n")
+        print("\nPlace the PDF files in the 'data/' folder and try again.\n")
         return
 
     existing_files = [data_dir / f for f in expected_files]
-    print(f"\n🚀 Enviando {len(existing_files)} documento(s) al servicio...\n")
+    print(f"\n🚀 Sending {len(existing_files)} document(s) to the service...\n")
 
     try:
         r = httpx.get(f"{INGESTION_BASE_URL}/health", timeout=10.0)
         r.raise_for_status()
     except Exception as e:
-        print(f"❌ No se puede contactar con el servicio de ingesta: {e}")
-        print(f"   ¿Está levantado?  uvicorn services.ingestion.main:app --port 8015")
-        print(f"   o  docker compose up -d ingestion")
+        print(f"❌ Cannot reach the ingestion service: {e}")
+        print(f"   Is it running?  uvicorn services.ingestion.main:app --port 8015")
+        print(f"   or  docker compose up -d ingestion")
         return
 
     successful = 0
@@ -93,7 +93,7 @@ def upload_documents() -> None:
         for i, file_path in enumerate(existing_files, 1):
             print(f"\n{'─' * 80}")
             print(f"[{i}/{len(existing_files)}] {file_path.name}")
-            print(f"Colección: {COLLECTION_NAME}")
+            print(f"Collection: {COLLECTION_NAME}")
             print("─" * 80)
 
             extract_str = "true" if EXTRACT_IMAGES else "false"
@@ -120,10 +120,10 @@ def upload_documents() -> None:
                     continue
 
                 if body.get("success"):
-                    print(f"✓ {file_path.name} procesado correctamente")
+                    print(f"✓ {file_path.name} processed successfully")
                     ri = body.get("result_info") or {}
                     print(f"  - File ID: {ri.get('file_id', 'N/A')}")
-                    print(f"  - Mensaje: {body.get('message', '')}")
+                    print(f"  - Message: {body.get('message', '')}")
                     successful += 1
                 else:
                     print(f"✗ Error: {body.get('message', body)}")
@@ -134,19 +134,21 @@ def upload_documents() -> None:
                 failed += 1
 
     print("\n" + "=" * 80)
-    print("RESUMEN DE SUBIDA")
+    print("UPLOAD SUMMARY")
     print("=" * 80)
-    print(f"✓ Exitosos: {successful}")
-    print(f"✗ Fallidos: {failed}")
+    print(f"✓ Successful: {successful}")
+    print(f"✗ Failed: {failed}")
 
     if successful > 0:
-        print("\n✅ Documentos listos para búsqueda.")
-        print(f"   Colección: {COLLECTION_NAME}")
-        print("   Ejecuta: python run_retrieval.py  |  python run_chatbot.py")
+        print("\n✅ Documents ready for search.")
+        print(f"   Collection: {COLLECTION_NAME}")
+        print("   Next steps (from the repo root, one command per line):")
+        print("     python examples/cv_recruitment/run_retrieval.py")
+        print("     python examples/cv_recruitment/run_chatbot.py")
 
 
 def main() -> None:
-    print("\n📤 Subida vía API de ingesta - Ejemplo 2: CVs y propuesta\n")
+    print("\n📤 Upload via ingestion API - CV Recruitment Example\n")
     upload_documents()
 
 

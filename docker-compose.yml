@@ -86,8 +86,11 @@ services:
     environment:
       MILVUS_HOST: standalone
       MILVUS_PORT: "19530"
+      MONGO_HOST: mongodb
     depends_on:
       standalone:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - milvus
@@ -104,8 +107,11 @@ services:
     environment:
       MILVUS_HOST: standalone
       MILVUS_PORT: "19530"
+      MONGO_HOST: mongodb
     depends_on:
       standalone:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - milvus
@@ -122,8 +128,11 @@ services:
     environment:
       MILVUS_HOST: standalone
       MILVUS_PORT: "19530"
+      MONGO_HOST: mongodb
     depends_on:
       standalone:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - milvus

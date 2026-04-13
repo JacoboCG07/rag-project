@@ -2,11 +2,12 @@
 Metadata Extractor
 Extracts document metadata using an LLM based on the user query.
 """
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from src.llms.text import BaseTextModel
 from src.utils import get_logger
+from src.utils.utils import PromptLoader
 import json
-import os
 import re
 
 
@@ -51,24 +52,16 @@ class MetadataExtractor:
     
     def _load_prompt(self) -> str:
         """
-        Loads the prompt from prompt.md.
-        
+        Loads the prompt from metadata_extractor_prompt.md.
+
         Returns:
             str: Prompt template.
-            
+
         Raises:
-            FileNotFoundError: If prompt.md is missing.
+            FileNotFoundError: If metadata_extractor_prompt.md is missing.
         """
-        prompt_path = os.path.join(os.path.dirname(__file__), "prompt.md")
-        try:
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except FileNotFoundError:
-            self.logger.error(f"Prompt file not found: {prompt_path}")
-            raise FileNotFoundError(
-                f"Prompt file not found: {prompt_path}. "
-                "The prompt.md file is required for metadata extraction."
-            )
+        prompt_path = Path(__file__).parent / "metadata_extractor_prompt.md"
+        return PromptLoader.read_file(str(prompt_path))
     
     def extract(
         self,
