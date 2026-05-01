@@ -9,7 +9,7 @@ app = FastAPI(
     version="1.0.0",
     description=(
         "Multipart upload of documents (PDF/TXT) into Milvus. "
-        "Chunk, overlap, and embedding: INGEST_* environment variables. "
+        "Runtime options are defined by IngestionPipelineConfig. "
         "Form fields: file, collection_name, extract_images, job_id."
     ),
 )

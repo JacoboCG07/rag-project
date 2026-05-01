@@ -235,7 +235,7 @@ curl -s -X POST http://localhost:8015/ingest \
 
 `search_type` values: `simple`, `with_selection`, `with_selection_and_metadata`.
 
-The query embedding model is the one configured in the pipeline (default in code / environment); this endpoint does **not** expose `embedding_model` or `filter_expr`.
+The query embedding model is whatever the retrieval pipeline uses by default in code (`SearchPipelineConfig` in `src/retrieval/config.py`); the JSON body does **not** override it.
 
 **Example**
 

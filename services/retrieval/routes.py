@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, HTTPException, status
 
+from src.retrieval.config_builder import build_search_pipeline_config
 from src.retrieval.pipeline import SearchPipeline
 from src.utils import get_logger
 
-from .config_from_request import build_search_pipeline_config
 from .schemas import SearchRequest, SearchResponse
 
 logger = get_logger(__name__)
@@ -21,7 +21,11 @@ def health() -> dict:
 @router.post("/search", response_model=SearchResponse)
 def search(body: SearchRequest) -> SearchResponse:
     try:
-        config = build_search_pipeline_config(body)
+        config = build_search_pipeline_config(
+            search_type=body.search_type,
+            collection_name=body.collection_name,
+            search_limit=body.search_limit,
+        )
     except ValueError as e:
         logger.warning("Invalid search configuration: %s", e)
         raise HTTPException(

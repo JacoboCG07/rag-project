@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, HTTPException, status
 
+from src.chatbot.config_from_request import build_chatbot_config
 from src.chatbot.rag_chatbot import RAGChatbot
 from src.utils import get_logger
 
-from .config_from_request import build_chatbot_config
 from .schemas import ChatRequest, ChatResponse
 
 logger = get_logger(__name__)
@@ -21,7 +21,12 @@ def health() -> dict:
 @router.post("/chat", response_model=ChatResponse)
 def chat(body: ChatRequest) -> ChatResponse:
     try:
-        config = build_chatbot_config(body)
+        config = build_chatbot_config(
+            search_type=body.search_type,
+            collection_name=body.collection_name,
+            search_limit=body.search_limit,
+            llm_model=body.llm_model,
+        )
     except ValueError as e:
         logger.warning("Invalid chatbot configuration: %s", e)
         raise HTTPException(
