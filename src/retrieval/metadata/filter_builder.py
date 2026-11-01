@@ -4,6 +4,7 @@ Construye expresiones de filtro de Milvus desde metadata extraída
 """
 from typing import Dict, List, Any, Optional
 from src.utils import get_logger
+from src.milvus.metadata_tags import like_any
 
 
 class MetadataFilterBuilder:
@@ -41,7 +42,7 @@ class MetadataFilterBuilder:
             str: Expresión de filtro de Milvus.
             
             Ejemplo:
-            'file_id == "doc_001" and pages in ["1", "2", "3"] and file_type == "PDF"'
+            'file_id == "doc_001" and (pages like "%*1*%" or pages like "%*2*%") and file_type == ".pdf"'
         """
         self.logger.debug(f"Building filter for document: {file_id}")
         
@@ -176,44 +177,32 @@ class MetadataFilterBuilder:
     def _build_pages_filter(self, pages: List[int]) -> str:
         """
         Construye filtro para páginas.
-        
+
+        Las páginas se guardan con asteriscos ("*11* *12*", ver src/milvus/metadata_tags.py),
+        así que un chunk que abarca varias páginas coincide con cualquiera de ellas.
+
         Args:
             pages: Lista de números de página.
-        
+
         Returns:
-            str: Filtro de páginas.
+            str: Filtro de páginas. Ej: '(pages like "%*1*%" or pages like "%*2*%")'
         """
-        # TODO: Implementar lógica de filtrado de páginas
-        # Depende de cómo se almacenan las páginas en Milvus
-        # Opciones:
-        # 1. Campo 'page_number' por chunk
-        # 2. Campo 'pages' con rango (ej: "1-5")
-        # 3. Otro formato
-        
-        if not pages:
-            return ""
-        
-        # Ejemplo: 'page_number in [1, 2, 3]'
-        pages_str = ", ".join([f'"{p}"' for p in pages])
-        return f'pages in [{pages_str}]'
-    
+        return like_any("pages", pages)
+
     def _build_chapters_filter(self, chapters: List[str]) -> str:
         """
         Construye filtro para capítulos.
-        
+
+        Los capítulos se guardan con asteriscos ("*VI* *VII*", ver src/milvus/metadata_tags.py),
+        así que buscar "V" no coincide con "VI" ni con "XV".
+
         Args:
             chapters: Lista de nombres de capítulos.
-        
+
         Returns:
-            str: Filtro de capítulos.
+            str: Filtro de capítulos. Ej: 'chapters like "%*VII*%"'
         """
-        # TODO: Implementar lógica de filtrado de capítulos
-        if not chapters:
-            return ""
-        
-        # Ejemplo: 'chapter in ["cap1", "cap2"]'
-        chapters_str = ", ".join([f'"{c}"' for c in chapters])
-        return f'chapters in [{chapters_str}]'
+        return like_any("chapters", chapters)
     
     def _build_num_image_filter(self, num_images: List[int]) -> str:
         """
