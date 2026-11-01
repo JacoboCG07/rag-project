@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from src.utils import get_logger
 from src.milvus.dto import SCHEMA_KEYS, build_milvus_insert_dict
+from src.milvus.metadata_tags import to_tagged
 
 
 class DocumentPreparer:
@@ -127,23 +128,9 @@ class DocumentPreparer:
         for i, (text, embedding) in enumerate(zip(texts, embeddings)):
             chunk_meta = chunks_metadata[i] if i < len(chunks_metadata) else {}
 
-            # Get pages for this chunk
-            pages_value = chunk_meta.get('pages', "")
-            if isinstance(pages_value, list):
-                pages_str = ','.join(str(p) for p in pages_value)
-            elif pages_value:
-                pages_str = str(pages_value)
-            else:
-                pages_str = ""
-
-            # Get chapters for this chunk
-            chapters_value = chunk_meta.get('chapters', "")
-            if isinstance(chapters_value, list):
-                chapters_str = ','.join(str(c) for c in chapters_value)
-            elif chapters_value:
-                chapters_str = str(chapters_value)
-            else:
-                chapters_str = ""
+            # Pages and chapters in tagged format ("*1* *2*") so they can be filtered with LIKE
+            pages_str = to_tagged(chunk_meta.get('pages', ""))
+            chapters_str = to_tagged(chunk_meta.get('chapters', ""))
 
             # Get image_number for this chunk
             image_number = chunk_meta.get('image_number', "")

@@ -315,30 +315,112 @@ def get_job_id() -> Optional[str]:
         return None
 
 
-def get_logger(name: Optional[str] = None):
+_STDLIB_LEVELS = {10: "DEBUG", 20: "INFO", 30: "WARNING", 40: "ERROR", 50: "CRITICAL"}
+
+
+class StdlibStyleLogger:
+    """
+    Wrapper around a Loguru logger that accepts standard `logging`-style calls.
+
+    The codebase logs as with the stdlib (`logger.info("x %s", v, extra={...},
+    exc_info=True)`), but Loguru treats any args/kwargs as `str.format()` arguments.
+    That breaks whenever the message contains braces (e.g. an OpenAI error such as
+    "{'error': {...}}" raises KeyError("'error'")) and leaves "%s" unformatted.
+
+    This wrapper translates the call instead:
+      - positional args -> `%`-style formatting (like stdlib)
+      - extra={...}     -> bound into record["extra"]["extra"] (flattened by the MongoDB sink)
+      - exc_info        -> `opt(exception=...)`
+    The message is never passed through `str.format()`.
+    """
+
+    __slots__ = ("_logger",)
+
+    def __init__(self, loguru_logger):
+        self._logger = loguru_logger
+
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1, **kwargs):
+        message = str(msg)
+        if args:
+            try:
+                message = message % args
+            except (TypeError, ValueError):
+                message = " ".join([message, *map(str, args)])
+
+        target = self._logger
+        if extra:
+            target = target.bind(extra=extra)
+        if kwargs:
+            target = target.bind(**kwargs)
+
+        if exc_info is True:
+            exception = True
+        elif exc_info:  # exception instance or (type, value, tb) tuple
+            exception = exc_info
+        else:
+            exception = None
+
+        # depth=2: skip _log and the public method so file/function/line point to the caller
+        target.opt(depth=2, exception=exception).log(level, message)
+
+    def debug(self, msg, *args, **kwargs):
+        self._log("DEBUG", msg, args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        self._log("INFO", msg, args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self._log("WARNING", msg, args, **kwargs)
+
+    warn = warning
+
+    def error(self, msg, *args, **kwargs):
+        self._log("ERROR", msg, args, **kwargs)
+
+    def exception(self, msg, *args, exc_info=True, **kwargs):
+        self._log("ERROR", msg, args, exc_info=exc_info, **kwargs)
+
+    def critical(self, msg, *args, **kwargs):
+        self._log("CRITICAL", msg, args, **kwargs)
+
+    def log(self, level, msg, *args, **kwargs):
+        if isinstance(level, int):
+            level = _STDLIB_LEVELS.get(level, level)
+        self._log(level, msg, args, **kwargs)
+
+    def bind(self, **kwargs) -> "StdlibStyleLogger":
+        return StdlibStyleLogger(self._logger.bind(**kwargs))
+
+    def __getattr__(self, attr):
+        # Anything else (add, remove, opt, contextualize, ...) goes to Loguru directly
+        return getattr(self._logger, attr)
+
+
+def get_logger(name: Optional[str] = None) -> StdlibStyleLogger:
     """
     Gets an instance of the configured logger.
-    
+
     Args:
         name: Optional name for the logger (useful for identifying the module)
-    
+
     Returns:
-        Logger: Configured Loguru logger instance
-    
+        StdlibStyleLogger: Loguru logger that accepts standard `logging`-style calls
+            (`%s` args, `extra=`, `exc_info=`). See StdlibStyleLogger.
+
     Example:
         >>> from utils.logger import get_logger
         >>> logger = get_logger(__name__)
-        >>> logger.info("Information message")
+        >>> logger.info("Processed %s files", 3, extra={"job_id": "abc"})
     """
     # Ensure logger is initialized
     if not _logger_initialized:
         _initialize_logger()
-    
+
     # If a name is provided, use the logger with that name
     if name:
-        return logger.bind(name=name)
-    
-    return logger
+        return StdlibStyleLogger(logger.bind(name=name))
+
+    return StdlibStyleLogger(logger)
 
 
 def reinitialize_mongodb_sink():

@@ -5,6 +5,7 @@ RAG Chatbot - Retrieval + LLM generation pipeline
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+from src.milvus.metadata_tags import parse_tagged
 from src.retrieval.pipeline import SearchPipeline
 from src.llms.text import OpenAITextModel
 from src.utils.utils import PromptLoader
@@ -18,16 +19,21 @@ def _format_context(results: List[Dict[str, Any]]) -> str:
     if not results:
         return "No se encontró ningún fragmento relevante en la base de documentos."
 
+    # No numbering: the fragment is an internal unit the user never sees, so it must not be cited.
     parts = []
-    for i, r in enumerate(results, 1):
+    for r in results:
         text = r.get("text", "").strip()
-        file_name = r.get("file_name", "N/A")
-        pages = r.get("pages", "N/A")
-        score = r.get("score", 0)
-        if text:
-            parts.append(
-                f"### Fragmento {i} (Documento: {file_name}, páginas: {pages}, relevancia: {score:.2f})\n{text}"
-            )
+        if not text:
+            continue
+        header = [f"Documento: {r.get('file_name') or 'N/A'}"]
+        pages = ", ".join(parse_tagged(r.get("pages")))
+        if pages:
+            header.append(f"páginas: {pages}")
+        chapters = ", ".join(parse_tagged(r.get("chapters")))
+        if chapters:
+            header.append(f"capítulos: {chapters}")
+        header.append(f"relevancia: {r.get('score', 0):.2f}")
+        parts.append(f"### {' | '.join(header)}\n{text}")
     return "\n\n".join(parts) if parts else "No hay texto disponible en los resultados."
 
 

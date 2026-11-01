@@ -8,3 +8,8 @@ __pycache__/
 ww
 
 /.cursor
+# Variables de entorno (secretos)
+.env
+
+# Entorno virtual
+.venv/
