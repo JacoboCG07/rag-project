@@ -1,6 +1,9 @@
 """FastAPI entry point for the RAG chatbot service."""
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from src.utils.document_store import documents_dir
 
 from .routes import router
 
@@ -14,3 +17,8 @@ app = FastAPI(
 )
 
 app.include_router(router)
+
+# Original documents (written by the ingestion service), so cited sources can be opened.
+_docs = documents_dir()
+_docs.mkdir(parents=True, exist_ok=True)
+app.mount("/files", StaticFiles(directory=_docs), name="files")

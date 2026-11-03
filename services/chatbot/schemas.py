@@ -14,5 +14,14 @@ class ChatRequest(SearchRequest):
     )
 
 
+class ChatSource(BaseModel):
+    file_name: str = Field(..., description="Cited document")
+    pages: list[str] = Field(default_factory=list, description="Cited pages of the document")
+    url: str = Field(..., description="Relative URL of the original file, opened at the first cited page")
+
+
 class ChatResponse(BaseModel):
     answer: str = Field(..., description="Answer generated from RAG context")
+    sources: list[ChatSource] = Field(
+        default_factory=list, description="Documents and pages cited by the answer"
+    )

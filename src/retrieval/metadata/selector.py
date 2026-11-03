@@ -25,7 +25,7 @@ class MetadataSelector:
         dbname: str,
         collection_name: str,
         text_model: BaseTextModel,
-        max_tokens: int = 500,
+        max_tokens: int = 2000,
         temperature: float = 0.2,
         uri: str = None,
         token: str = None,

@@ -5,8 +5,9 @@ from fastapi import APIRouter, HTTPException, status
 from src.chatbot.config_from_request import build_chatbot_config
 from src.chatbot.rag_chatbot import RAGChatbot
 from src.utils import get_logger
+from src.utils.document_store import document_url
 
-from .schemas import ChatRequest, ChatResponse
+from .schemas import ChatRequest, ChatResponse, ChatSource
 
 logger = get_logger(__name__)
 
@@ -36,8 +37,18 @@ def chat(body: ChatRequest) -> ChatResponse:
 
     try:
         with RAGChatbot(config=config) as bot:
-            answer = bot.ask(query=body.query, job_id=body.job_id)
-        return ChatResponse(answer=answer)
+            answer, cited = bot.ask_with_sources(query=body.query, job_id=body.job_id)
+        sources = [
+            ChatSource(
+                file_name=c["file_name"],
+                pages=c["pages"],
+                url=document_url(
+                    body.collection_name, c["file_name"], c["pages"][0] if c["pages"] else None
+                ),
+            )
+            for c in cited
+        ]
+        return ChatResponse(answer=answer, sources=sources)
     except ValueError as e:
         logger.warning("Chat validation error: %s", e)
         raise HTTPException(

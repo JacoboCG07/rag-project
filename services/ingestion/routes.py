@@ -12,6 +12,7 @@ from src.ingestion.config import IngestionPipelineConfig
 from src.ingestion.extractors.factory import DocumentExtractorFactory
 from src.ingestion.ingestion_pipeline import IngestionPipeline
 from src.utils import get_logger
+from src.utils.document_store import save_document
 
 from .multipart_parse import normalize_job_id, parse_extract_images
 from .schemas import IngestionRequest, IngestionResponse
@@ -86,6 +87,13 @@ async def ingest(
                 extract_process_images=extract_flag,
                 job_id=job_id,
             )
+
+        if success:
+            # Keep the original so the chatbot can serve it when the answer cites it.
+            try:
+                save_document(body.collection_name, safe_name, contents)
+            except OSError as e:
+                logger.warning("Could not store original document %s: %s", safe_name, e)
 
         return IngestionResponse(
             success=success,

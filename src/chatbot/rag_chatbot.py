@@ -2,8 +2,10 @@
 RAG Chatbot - Retrieval + LLM generation pipeline
 """
 
+import json
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from src.milvus.metadata_tags import parse_tagged
 from src.retrieval.pipeline import SearchPipeline
@@ -35,6 +37,64 @@ def _format_context(results: List[Dict[str, Any]]) -> str:
         header.append(f"relevancia: {r.get('score', 0):.2f}")
         parts.append(f"### {' | '.join(header)}\n{text}")
     return "\n\n".join(parts) if parts else "No hay texto disponible en los resultados."
+
+
+_SOURCES_RE = re.compile(r"<sources>(.*?)</sources>", re.DOTALL | re.IGNORECASE)
+
+
+def split_sources(
+    raw_answer: str, results: List[Dict[str, Any]]
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Separate the `<sources>[...]</sources>` block the LLM appends from the visible answer.
+
+    Cited sources are checked against the retrieved results: documents or pages that were not
+    in the context are dropped, so a source never points to something the LLM made up.
+
+    Returns:
+        (answer without the block, [{"file_name": str, "pages": [str, ...]}, ...]).
+        Sources are [] when the block is missing or malformed.
+    """
+    match = _SOURCES_RE.search(raw_answer)
+    answer = _SOURCES_RE.sub("", raw_answer).strip()
+    if not match:
+        return answer, []
+    try:
+        cited = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return answer, []
+    if not isinstance(cited, list):
+        return answer, []
+
+    # What was actually retrieved: file_name -> set of pages
+    retrieved: Dict[str, set] = {}
+    for r in results:
+        name = r.get("file_name")
+        if name:
+            retrieved.setdefault(name, set()).update(parse_tagged(r.get("pages")))
+
+    sources: List[Dict[str, Any]] = []
+    seen: Dict[str, Dict[str, Any]] = {}
+    for item in cited:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("file_name")
+        if name not in retrieved:
+            continue
+        pages = item.get("pages") or []
+        if not isinstance(pages, list):
+            pages = [pages]
+        valid = [str(p).strip() for p in pages if str(p).strip() in retrieved[name]]
+        if name in seen:
+            seen[name]["pages"] += [p for p in valid if p not in seen[name]["pages"]]
+            continue
+        entry = {"file_name": name, "pages": list(dict.fromkeys(valid))}
+        seen[name] = entry
+        sources.append(entry)
+
+    for entry in sources:
+        entry["pages"].sort(key=lambda p: (not p.isdigit(), int(p) if p.isdigit() else 0, p))
+    return answer, sources
 
 
 def _get_rag_prompt(user_query: str, context: str) -> tuple[str, str]:
@@ -105,7 +165,19 @@ class RAGChatbot:
             job_id: Optional job identifier for tracking logs.
 
         Returns:
-            str: Generated answer.
+            str: Generated answer (without the machine-readable sources block).
+        """
+        answer, _ = self.ask_with_sources(query=query, job_id=job_id)
+        return answer
+
+    def ask_with_sources(
+        self, query: str, job_id: Optional[str] = None
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Like `ask`, but also returns the sources cited by the LLM.
+
+        Returns:
+            (answer, [{"file_name": str, "pages": [str, ...]}, ...])
         """
         self.logger.info("Processing query", extra={"query_length": len(query)})
         results = self.pipeline.search(query=query, job_id=job_id)
@@ -119,7 +191,7 @@ class RAGChatbot:
             max_tokens=self.config.llm_max_tokens,
             temperature=self.config.llm_temperature,
         )
-        return response.strip()
+        return split_sources(response, results)
 
     def close(self) -> None:
         """Close pipeline connections."""
