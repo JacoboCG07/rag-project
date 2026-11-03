@@ -70,7 +70,7 @@ class SearchPipelineConfig(BaseModel):
         description="LLM model for document selection (required when search_type == 'with_selection')"
     )
     chooser_max_tokens: int = Field(
-        default=500,
+        default=2000,
         ge=100,
         le=2000,
         description="Maximum tokens for document chooser LLM"

@@ -22,7 +22,7 @@ class MetadataExtractor:
     def __init__(
         self,
         text_model: BaseTextModel,
-        max_tokens: int = 500,
+        max_tokens: int = 2000,
         temperature: float = 0.2
     ):
         """
