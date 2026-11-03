@@ -108,6 +108,9 @@ services:
       MILVUS_HOST: standalone
       MILVUS_PORT: "19530"
       MONGO_HOST: mongodb
+      DOCUMENTS_DIR: /app/documents
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/documents:/app/documents:ro
     depends_on:
       standalone:
         condition: service_healthy
@@ -129,6 +132,9 @@ services:
       MILVUS_HOST: standalone
       MILVUS_PORT: "19530"
       MONGO_HOST: mongodb
+      DOCUMENTS_DIR: /app/documents
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/documents:/app/documents
     depends_on:
       standalone:
         condition: service_healthy

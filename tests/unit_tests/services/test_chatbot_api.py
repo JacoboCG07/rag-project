@@ -32,7 +32,10 @@ def test_chat_returns_answer(mock_bot_cls: MagicMock, client: TestClient) -> Non
     mock_bot_cls.return_value = mock_bot
     mock_bot.__enter__.return_value = mock_bot
     mock_bot.__exit__.return_value = None
-    mock_bot.ask.return_value = "Respuesta generada."
+    mock_bot.ask_with_sources.return_value = (
+        "Respuesta generada.",
+        [{"file_name": "principito.pdf", "pages": ["9", "10"]}],
+    )
 
     payload = {
         "query": "¿Hola?",
@@ -46,5 +49,14 @@ def test_chat_returns_answer(mock_bot_cls: MagicMock, client: TestClient) -> Non
 
     assert response.status_code == 200
     body = response.json()
-    assert body == {"answer": "Respuesta generada."}
-    mock_bot.ask.assert_called_once_with(query="¿Hola?", job_id="job-1")
+    assert body == {
+        "answer": "Respuesta generada.",
+        "sources": [
+            {
+                "file_name": "principito.pdf",
+                "pages": ["9", "10"],
+                "url": "/files/test_collection/principito.pdf#page=9",
+            }
+        ],
+    }
+    mock_bot.ask_with_sources.assert_called_once_with(query="¿Hola?", job_id="job-1")
