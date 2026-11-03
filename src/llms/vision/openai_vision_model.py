@@ -13,6 +13,7 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 from .base_vision_model import BaseVisionModel
+from src.llms.model_params import generation_params
 from src.utils import get_logger
 
 
@@ -21,6 +22,13 @@ class OpenAIVisionModel(BaseVisionModel):
     Vision model using OpenAI Vision API.
     Supports multiple models and can be used for various vision tasks.
     """
+
+    # Env var with the API key; subclasses (e.g. Azure) override it
+    API_KEY_ENV = "OPENAI_API_KEY"
+
+    def _create_client(self):
+        """Creates the API client. Subclasses (e.g. Azure) override it."""
+        return OpenAI(api_key=self.api_key)
 
     def __init__(
         self,
@@ -48,17 +56,17 @@ class OpenAIVisionModel(BaseVisionModel):
                 "openai package is required. Install it with: pip install openai"
             )
 
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or os.getenv(self.API_KEY_ENV)
         if not self.api_key:
             raise ValueError(
                 "OpenAI API key is required. "
-                "Provide it as parameter or set OPENAI_API_KEY environment variable."
+                f"Provide it as parameter or set {self.API_KEY_ENV} environment variable."
             )
 
         self.model = model
         self.default_max_tokens = max_tokens
         self.default_temperature = temperature
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = self._create_client()
         self.logger = get_logger(__name__)
         
         self.logger.debug(
@@ -149,8 +157,11 @@ class OpenAIVisionModel(BaseVisionModel):
                         "content": content
                     }
                 ],
-                "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
-                "temperature": temperature if temperature is not None else self.default_temperature,
+                **generation_params(
+                    model=self.model,
+                    max_tokens=max_tokens if max_tokens is not None else self.default_max_tokens,
+                    temperature=temperature if temperature is not None else self.default_temperature,
+                ),
             }
 
             # Add any additional kwargs

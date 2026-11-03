@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 CHATBOT_BASE_URL = "http://localhost:8018"
 
-MODEL = "gpt-4o-mini"
+MODEL = None  # None = modelo por defecto del proveedor (Azure: AZURE_OPENAI_CHAT_DEPLOYMENT_NAME)
 SEARCH_TYPE = "with_selection"
 SEARCH_LIMIT = 10
 

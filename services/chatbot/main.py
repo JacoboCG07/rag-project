@@ -9,7 +9,7 @@ app = FastAPI(
     version="1.0.0",
     description=(
         "Answers generated with context retrieved from Milvus. "
-        "Requires OPENAI_API_KEY; embedding dimension must match the collection."
+        "Requires OPENAI_API_KEY (or AZURE_OPENAI_* with LLM_PROVIDER=azure); embedding dimension must match the collection."
     ),
 )
 

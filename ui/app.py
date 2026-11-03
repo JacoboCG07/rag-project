@@ -17,6 +17,9 @@ import streamlit as st
 
 CHATBOT_BASE_URL = os.getenv("CHATBOT_BASE_URL", "http://localhost:8018")
 SEARCH_TYPES = ["simple", "with_selection", "with_selection_and_metadata"]
+COLLECTIONS = ["principito_imagenes", "cv_recruitment"]
+# Deployments de chat de Azure (el primero es el seleccionado por defecto)
+LLM_MODELS = ["gpt-5.4-mini", "gpt-5.4-nano", "gpt-5-nano", "gpt-5.6-luna", "gpt-6-luna"]
 
 st.set_page_config(page_title="Chat RAG", page_icon="💬")
 st.title("💬 Chat RAG")
@@ -24,10 +27,10 @@ st.title("💬 Chat RAG")
 # --- Configuración (barra lateral) ---
 with st.sidebar:
     st.header("Configuración")
-    collection_name = st.text_input("Colección", value="principito_imagenes")
+    collection_name = st.selectbox("Colección", COLLECTIONS, index=0)
     search_type = st.selectbox("Tipo de búsqueda", SEARCH_TYPES, index=0)
     search_limit = st.slider("Límite de resultados", min_value=5, max_value=25, value=10)
-    llm_model = st.text_input("Modelo LLM", value="gpt-4o-mini")
+    llm_model = st.selectbox("Modelo LLM", LLM_MODELS, index=0)
     st.caption(f"Servicio: {CHATBOT_BASE_URL}")
     if st.button("Borrar conversación"):
         st.session_state.mensajes = []

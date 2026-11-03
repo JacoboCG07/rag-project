@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from src.milvus.metadata_tags import parse_tagged
 from src.retrieval.pipeline import SearchPipeline
-from src.llms.text import OpenAITextModel
+from src.llms import BaseTextModel, create_text_model
 from src.utils.utils import PromptLoader
 from src.utils import get_logger
 
@@ -53,7 +53,7 @@ def _get_rag_prompt(user_query: str, context: str) -> tuple[str, str]:
 class RAGChatbot:
     """
     RAG Chatbot: retrieval + LLM generation.
-    Uses SearchPipeline for retrieval and OpenAITextModel for answer generation.
+    Uses SearchPipeline for retrieval and the configured text model (OpenAI/Azure) for answer generation.
     """
 
     def __init__(self, config: ChatbotConfig):
@@ -66,10 +66,10 @@ class RAGChatbot:
         self.config = config
         self.logger = get_logger(__name__)
         self._pipeline: Optional[SearchPipeline] = None
-        self._llm: Optional[OpenAITextModel] = None
+        self._llm: Optional[BaseTextModel] = None
 
         self._pipeline = SearchPipeline(config=config.retrieval)
-        self._llm = OpenAITextModel(
+        self._llm = create_text_model(
             model=config.llm_model,
             max_tokens=config.llm_max_tokens,
             temperature=config.llm_temperature,
@@ -90,7 +90,7 @@ class RAGChatbot:
         return self._pipeline
 
     @property
-    def llm(self) -> OpenAITextModel:
+    def llm(self) -> BaseTextModel:
         """LLM for answer generation."""
         if self._llm is None:
             raise RuntimeError("Chatbot has been closed")
