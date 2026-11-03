@@ -8,9 +8,8 @@ from enum import Enum
 from typing import Optional
 from dotenv import load_dotenv
 from src.utils import get_logger
-from src.llms.text import BaseTextModel, OpenAITextModel
+from src.llms import BaseEmbedder, BaseTextModel, create_embedder, create_text_model
 from pydantic import BaseModel, Field, model_validator, ConfigDict
-from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from src.milvus.partitions import partition_documents, partition_summaries
 
 load_dotenv()
@@ -52,8 +51,8 @@ class SearchPipelineConfig(BaseModel):
     )
     
     # Embedding configuration (para convertir query a embedding internamente)
-    embedder: OpenAIEmbedder = Field(
-        default_factory=lambda: OpenAIEmbedder(model="text-embedding-ada-002", count_tokens=False),
+    embedder: BaseEmbedder = Field(
+        default_factory=lambda: create_embedder(count_tokens=False),
         description="Embedder para convertir la query a vector"
     )
     
@@ -91,10 +90,10 @@ class SearchPipelineConfig(BaseModel):
         # If search type requires document selection, text_model is required
         if self.search_type in [SearchType.WITH_SELECTION, SearchType.WITH_SELECTION_AND_METADATA]:
             if self.text_model is None:
-                # Try to create a default OpenAI model if available
+                # Try to create a default text model for the configured provider
                 try:
-                    self.text_model = OpenAITextModel(model="gpt-4o-mini")
-                    logger.info("Created default OpenAI text model for document selection")
+                    self.text_model = create_text_model()
+                    logger.info("Created default text model for document selection")
                 except Exception as e:
                     logger.error(
                         f"text_model is required for search type '{self.search_type.value}'. Error creating default: {str(e)}"

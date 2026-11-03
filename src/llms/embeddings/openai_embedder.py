@@ -22,6 +22,13 @@ class OpenAIEmbedder(BaseEmbedder):
     Supports multiple models and token counting.
     """
 
+    # Env var with the API key; subclasses (e.g. Azure) override it
+    API_KEY_ENV = "OPENAI_API_KEY"
+
+    def _create_client(self):
+        """Creates the API client. Subclasses (e.g. Azure) override it."""
+        return OpenAI(api_key=self.api_key)
+
     # Mapping of OpenAI embedding models to their vector dimensions
     MODEL_DIMENSIONS = {
         "text-embedding-3-small": 1536,
@@ -49,16 +56,16 @@ class OpenAIEmbedder(BaseEmbedder):
             ValueError: If api_key is not provided and OPENAI_API_KEY env var is not set.
         """
 
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.api_key = os.getenv(self.API_KEY_ENV)
         if not self.api_key:
             raise ValueError(
                 "OpenAI API key is required. "
-                "Provide it as parameter or set OPENAI_API_KEY environment variable."
+                f"Set the {self.API_KEY_ENV} environment variable."
             )
 
         self.model = model
         self.count_tokens = count_tokens
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = self._create_client()
         self.logger = get_logger(__name__)
         
         # Calculate dimensions based on model
@@ -205,12 +212,12 @@ class OpenAIEmbedder(BaseEmbedder):
         # Create instance without calling __init__ directly
         # We'll set attributes manually to avoid re-reading env var
         instance = cls.__new__(cls)
-        instance.api_key = config["api_key"]
-        instance.model = config["model"]
-        instance.count_tokens = config["count_tokens"]
+        # Restore every serialized attribute (subclasses may add their own, e.g. Azure endpoint)
+        for key, value in config.items():
+            setattr(instance, key, value)
         instance.logger = get_logger(__name__)
         # Create client in worker process
-        instance.client = OpenAI(api_key=instance.api_key)
+        instance.client = instance._create_client()
         # Calculate dimensions based on model
         if instance.model in cls.MODEL_DIMENSIONS:
             instance.dimensions = cls.MODEL_DIMENSIONS[instance.model]

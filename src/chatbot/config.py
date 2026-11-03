@@ -15,15 +15,15 @@ class ChatbotConfig(BaseModel):
         ...,
         description="Search pipeline config: collection_name, search_type, search_limit, etc."
     )
-    llm_model: str = Field(
-        default="gpt-4o-mini",
-        description="LLM model for answer generation (e.g. gpt-4o-mini, gpt-4o)"
+    llm_model: Optional[str] = Field(
+        default=None,
+        description="LLM model for answer generation (on Azure: deployment name). None = provider default"
     )
     llm_max_tokens: int = Field(
-        default=1000,
+        default=4000,
         ge=1,
         le=16_384,
-        description="Maximum tokens for LLM response"
+        description="Maximum tokens for LLM response (on reasoning models it also includes reasoning tokens)"
     )
     llm_temperature: float = Field(
         default=0.3,

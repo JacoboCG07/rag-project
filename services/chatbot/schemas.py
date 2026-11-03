@@ -8,9 +8,9 @@ from services.retrieval.schemas import SearchRequest
 class ChatRequest(SearchRequest):
     """Extends the `POST /search` body (`SearchRequest`) with the chat model."""
 
-    llm_model: str = Field(
-        default="gpt-4o-mini",
-        description="OpenAI model used to generate the answer",
+    llm_model: str | None = Field(
+        default=None,
+        description="Model used to generate the answer (on Azure: deployment name). Empty = provider default",
     )
 
 

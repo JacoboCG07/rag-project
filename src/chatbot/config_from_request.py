@@ -10,7 +10,7 @@ def build_chatbot_config(
     search_type: SearchType,
     collection_name: str,
     search_limit: int,
-    llm_model: str,
+    llm_model: str | None,
 ) -> ChatbotConfig:
     retrieval = build_search_pipeline_config(
         search_type=search_type,

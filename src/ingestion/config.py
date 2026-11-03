@@ -5,9 +5,11 @@ Uses Pydantic for type validation and configuration management
 import os
 from dotenv import load_dotenv
 from src.utils import get_logger
-from src.llms import OpenAITextModel, OpenAIVisionModel
+from src.llms import (
+    BaseEmbedder, BaseTextModel, BaseVisionModel,
+    create_embedder, create_text_model, create_vision_model,
+)
 from typing import Optional, Callable, Any, List, Tuple
-from src.llms.embeddings.openai_embedder import OpenAIEmbedder
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from src.ingestion.processing.summarizer.llm_summarizer import LLMSummarizer
 from src.ingestion.processing.describer.llm_image_describer import LLMImageDescriber
@@ -43,11 +45,11 @@ class IngestionPipelineConfig(BaseModel):
     chunk_overlap: int = Field(default=0, ge=10, le=1000, description="Number of characters to overlap between chunks")
     
     # Embedding configuration
-    embedder: OpenAIEmbedder = Field(default_factory=lambda: OpenAIEmbedder(model="text-embedding-ada-002", count_tokens=False))
+    embedder: BaseEmbedder = Field(default_factory=lambda: create_embedder(count_tokens=False))
     generate_embeddings_func: Optional[Callable[[str], Tuple[List[float], Optional[int]]]] = Field(default=None, exclude=True)
 
     # Summary configuration
-    text_model: OpenAITextModel = Field(default_factory=lambda: OpenAITextModel(model="gpt-4o"))
+    text_model: BaseTextModel = Field(default_factory=lambda: create_text_model())
     summarizer: Optional[LLMSummarizer] = Field(default=None)
     generate_summary_func: Optional[Callable[[str], str]] = Field(default=None, exclude=True)
     
@@ -61,7 +63,7 @@ class IngestionPipelineConfig(BaseModel):
     )
 
     # Image description configuration
-    vision_model: OpenAIVisionModel = Field(default_factory=lambda: OpenAIVisionModel(model="gpt-4o"))
+    vision_model: BaseVisionModel = Field(default_factory=lambda: create_vision_model())
     image_describer: Optional[LLMImageDescriber] = Field(default=None)
     describe_image_func: Optional[Callable[..., str]] = Field(default=None, exclude=True)
     
