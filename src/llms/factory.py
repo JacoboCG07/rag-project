@@ -45,8 +45,8 @@ def create_vision_model(**kwargs) -> BaseVisionModel:
 def create_embedder(*, model: str | None = None, **kwargs) -> BaseEmbedder:
     """
     Creates the embedder for the configured provider. kwargs: count_tokens.
-    If model is None, both providers use text-embedding-3-small
-    (Azure: AZURE_OPENAI_EMBEDDING_MODEL_DEPLOYMENT_NAME if set).
+    If model is None: OpenAI uses text-embedding-3-small;
+    Azure uses AZURE_OPENAI_EMBEDDING_MODEL_DEPLOYMENT_NAME (required).
     """
     kwargs = _drop_none({"model": model, **kwargs})
     cls = AzureEmbedder if get_provider() == "azure" else OpenAIEmbedder

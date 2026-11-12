@@ -3,12 +3,11 @@ Azure OpenAI embedder implementation
 Same behaviour as OpenAIEmbedder; only the client changes.
 """
 
-import os
 from typing import Optional
 
 from .openai_embedder import OpenAIEmbedder
 from src.llms.azure_config import (
-    AZURE_API_KEY_ENV, azure_endpoint, azure_api_version, create_azure_client,
+    AZURE_API_KEY_ENV, azure_endpoint, azure_api_version, azure_deployment, create_azure_client,
 )
 
 
@@ -27,13 +26,12 @@ class AzureEmbedder(OpenAIEmbedder):
         model: Optional[str] = None,
         count_tokens: bool = True,
         endpoint: Optional[str] = None,
-        api_version: Optional[str] = None,
     ):
         # Must be set before super().__init__(), which calls _create_client()
         self.endpoint = azure_endpoint(endpoint)
-        self.api_version = azure_api_version(api_version)
+        self.api_version = azure_api_version()
         super().__init__(
-            model=model or os.getenv("AZURE_OPENAI_EMBEDDING_MODEL_DEPLOYMENT_NAME", "text-embedding-3-small"),
+            model=azure_deployment(model, "AZURE_OPENAI_EMBEDDING_MODEL_DEPLOYMENT_NAME"),
             count_tokens=count_tokens,
         )
 

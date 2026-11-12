@@ -17,6 +17,9 @@ if project_root not in sys.path:
 from src.llms.vision import BaseVisionModel
 from src.ingestion.processing.describer.llm_image_describer import LLMImageDescriber
 
+# The describer loads its prompt with an absolute path next to the module
+PROMPT_PATH_PARTS = ("src", "ingestion", "processing", "describer", "image_describer_prompt.md")
+
 
 class MockVisionModel(BaseVisionModel):
     """Mock implementation of BaseVisionModel for testing"""
@@ -107,7 +110,8 @@ class TestLLMImageDescriber:
         assert mock_vision_model.last_images == image_base64
         assert mock_vision_model.last_max_tokens == 300
         assert mock_vision_model.last_temperature == 0.3
-        mock_prompt_loader.assert_called_once_with("src/ingestion/processing/describer/image_describer_prompt.md")
+        mock_prompt_loader.assert_called_once()
+        assert Path(mock_prompt_loader.call_args.args[0]).parts[-5:] == PROMPT_PATH_PARTS
     
     def test_describe_image_with_custom_prompt(self, mock_vision_model, mock_prompt_loader):
         """Test image description with custom prompt"""
@@ -174,4 +178,5 @@ class TestLLMImageDescriber:
         
         assert prompt == "System prompt for image description"
         assert isinstance(prompt, str)
-        mock_prompt_loader.assert_called_once_with("src/ingestion/processing/describer/image_describer_prompt.md")
+        mock_prompt_loader.assert_called_once()
+        assert Path(mock_prompt_loader.call_args.args[0]).parts[-5:] == PROMPT_PATH_PARTS

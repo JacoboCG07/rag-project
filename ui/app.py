@@ -14,14 +14,21 @@ import uuid
 
 import httpx
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 CHATBOT_BASE_URL = os.getenv("CHATBOT_BASE_URL", "http://localhost:8018")
 # URL from which the user's browser reaches the chatbot (to open PDFs); usually the same.
 CHATBOT_PUBLIC_URL = os.getenv("CHATBOT_PUBLIC_URL", CHATBOT_BASE_URL)
 SEARCH_TYPES = ["simple", "with_selection", "with_selection_and_metadata"]
 COLLECTIONS = ["principito_imagenes", "cv_recruitment"]
-# Deployments de chat de Azure (el primero es el seleccionado por defecto)
-LLM_MODELS = ["gpt-5.4-mini", "gpt-5.4-nano", "gpt-5-nano", "gpt-5.6-luna", "gpt-6-luna"]
+# Modelos (en Azure, nombres de deployment) separados por comas en UI_LLM_MODELS.
+# La primera opción usa el modelo por defecto del servicio chatbot.
+DEFAULT_MODEL_LABEL = "Por defecto del servicio"
+LLM_MODELS = [DEFAULT_MODEL_LABEL] + [
+    m.strip() for m in os.getenv("UI_LLM_MODELS", "").split(",") if m.strip()
+]
 
 st.set_page_config(page_title="Chat RAG", page_icon="💬")
 st.title("💬 Chat RAG")
@@ -66,7 +73,7 @@ def preguntar(query: str) -> tuple[str, list[dict]]:
         "collection_name": collection_name,
         "search_type": search_type,
         "search_limit": search_limit,
-        "llm_model": llm_model,
+        "llm_model": None if llm_model == DEFAULT_MODEL_LABEL else llm_model,
         "job_id": f"ui_{st.session_state.session_id}.{len(st.session_state.mensajes)}",
     }
     try:
