@@ -3,12 +3,11 @@ Azure OpenAI Vision model implementation
 Same behaviour as OpenAIVisionModel; only the client changes.
 """
 
-import os
 from typing import Optional
 
 from .openai_vision_model import OpenAIVisionModel
 from src.llms.azure_config import (
-    AZURE_API_KEY_ENV, azure_endpoint, azure_api_version, create_azure_client,
+    AZURE_API_KEY_ENV, azure_endpoint, azure_api_version, azure_deployment, create_azure_client,
 )
 
 
@@ -28,14 +27,13 @@ class AzureVisionModel(OpenAIVisionModel):
         max_tokens: int = 500,
         temperature: float = 0.0,
         endpoint: Optional[str] = None,
-        api_version: Optional[str] = None,
     ):
         # Must be set before super().__init__(), which calls _create_client()
         self.endpoint = azure_endpoint(endpoint)
-        self.api_version = azure_api_version(api_version)
+        self.api_version = azure_api_version()
         super().__init__(
             api_key=api_key,
-            model=model or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-5.4-mini"),
+            model=azure_deployment(model, "AZURE_OPENAI_CHAT_DEPLOYMENT_NAME"),
             max_tokens=max_tokens,
             temperature=temperature,
         )

@@ -11,7 +11,6 @@ except ImportError:  # handled by the model classes (OPENAI_AVAILABLE)
     AzureOpenAI = None
 
 AZURE_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
-DEFAULT_API_VERSION = "2024-12-01-preview"
 
 
 def azure_endpoint(value: Optional[str] = None) -> str:
@@ -22,9 +21,20 @@ def azure_endpoint(value: Optional[str] = None) -> str:
     return endpoint
 
 
-def azure_api_version(value: Optional[str] = None) -> str:
-    """Returns the Azure API version (param, AZURE_OPENAI_API_VERSION env var or default)."""
-    return value or os.getenv("AZURE_OPENAI_API_VERSION") or DEFAULT_API_VERSION
+def azure_api_version() -> str:
+    """Returns the Azure API version from the AZURE_OPENAI_API_VERSION env var (no default)."""
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+    if not api_version:
+        raise ValueError("Azure API version is required. Set AZURE_OPENAI_API_VERSION environment variable.")
+    return api_version
+
+
+def azure_deployment(model: Optional[str], env_var: str) -> str:
+    """Returns the deployment name (param or the given env var, no default)."""
+    deployment = model or os.getenv(env_var)
+    if not deployment:
+        raise ValueError(f"Azure deployment name is required. Set {env_var} environment variable.")
+    return deployment
 
 
 def create_azure_client(*, api_key: str, endpoint: str, api_version: str):

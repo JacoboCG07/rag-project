@@ -6,6 +6,7 @@ import pytest
 from pathlib import Path
 import sys
 from unittest.mock import Mock, patch, MagicMock
+from loguru import logger
 
 # Add project root to path so that "src" is a package (same as production)
 _current_file = Path(__file__).resolve()
@@ -121,22 +122,28 @@ class TestLLMSummarizer:
         assert "Error generating summary" in str(exc_info.value)
         assert "API error" in str(exc_info.value)
     
-    def test_generate_summary_truncates_long_text(self, mock_text_model, mock_prompt_loader, caplog):
+    def test_generate_summary_truncates_long_text(self, mock_text_model, mock_prompt_loader):
         """Test that text exceeding max_input_chars is truncated with warning"""
         summarizer = LLMSummarizer(
             text_model=mock_text_model,
-            max_input_chars=50
+            max_input_chars=300
         )
-        long_text = "A" * 100 + ". Segunda oración."
+        long_text = "A" * 400 + ". Segunda oración."
 
-        result = summarizer.generate_summary(long_text)
+        # The project logs with Loguru, which pytest's caplog does not capture
+        warnings = []
+        sink_id = logger.add(lambda m: warnings.append(str(m)), level="WARNING")
+        try:
+            result = summarizer.generate_summary(long_text)
+        finally:
+            logger.remove(sink_id)
 
         assert result == "Mock summary response"
         assert mock_text_model.call_count == 1
         prompt_sent = mock_text_model.last_prompt
         assert "Texto recortado" in prompt_sent or "recortado" in prompt_sent.lower()
-        assert len(prompt_sent) <= 50 + 100  # truncated content + suffix
-        assert "Texto muy largo" in caplog.text or "Truncando" in caplog.text
+        assert len(prompt_sent) <= 300  # the limit includes the truncation note
+        assert any("Truncando" in w for w in warnings)
 
     def test_generate_summary_short_text_not_truncated(self, mock_text_model, mock_prompt_loader):
         """Test that text under max_input_chars is passed unchanged"""

@@ -31,7 +31,7 @@ def test_unsupported_extension(client: TestClient) -> None:
     data = {"collection_name": "c1", "extract_images": "false"}
     response = client.post("/ingest", files=files, data=data)
     assert response.status_code == 400
-    assert "no soportado" in response.json()["detail"].lower() or "soportado" in response.json()["detail"]
+    assert "unsupported" in response.json()["detail"].lower()
 
 
 @patch("services.ingestion.routes.IngestionPipeline")
