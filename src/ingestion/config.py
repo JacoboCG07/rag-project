@@ -82,7 +82,7 @@ class IngestionPipelineConfig(BaseModel):
         if self.generate_summary_func is None:
             self.generate_summary_func = self.summarizer.generate_summary
         if self.image_describer is None:
-            self.image_describer = LLMImageDescriber(vision_model=self.vision_model, max_tokens=1_000, temperature=0.3)
+            self.image_describer = LLMImageDescriber(vision_model=self.vision_model, max_tokens=2_000, temperature=0.3)
         if self.describe_image_func is None:
             self.describe_image_func = self.image_describer.describe_image
         

@@ -23,7 +23,7 @@ class LLMDocumentChooser:
         self,
         *,
         text_model: Optional[BaseTextModel] = None,
-        max_tokens: int = 500,
+        max_tokens: int = 2000,
         temperature: float = 0.2
     ):
         """
@@ -31,7 +31,7 @@ class LLMDocumentChooser:
 
         Args:
             text_model: BaseTextModel instance to use. Must be provided.
-            max_tokens: Maximum tokens for response (default 500).
+            max_tokens: Maximum tokens for response (default 2000).
             temperature: Temperature for generation (default 0.2, lower for more focused selections).
 
         Raises:

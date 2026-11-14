@@ -11,6 +11,6 @@ You are an expert assistant in image analysis. Your task is to analyse the provi
 The description must be:
 - Clear and detailed
 - Objective and precise
-- Written in English
-- Complete but concise, respecting the specified token limit
+- Written in Spanish
+- Complete but concise: between 500 and 600 words
 - Useful for understanding the image content without having to see it

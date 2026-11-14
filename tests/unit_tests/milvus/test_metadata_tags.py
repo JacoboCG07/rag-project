@@ -110,6 +110,15 @@ class TestFilterBuilder:
             'and chapters like "%*VII*%" and file_type == ".pdf"'
         )
 
+    def test_num_image_uses_schema_field(self):
+        """El campo en Milvus es image_number; num_image no existe y rompía la búsqueda."""
+        expr = MetadataFilterBuilder().build_filter_for_document(
+            "doc1", {"num_image": [2, 3], "file_type": "PDF"}
+        )
+        assert expr == (
+            'file_id == "doc1" and image_number in ["2", "3"] and file_type == ".pdf"'
+        )
+
 
 class TestDocumentPreparer:
     def test_pages_and_chapters_are_tagged(self):

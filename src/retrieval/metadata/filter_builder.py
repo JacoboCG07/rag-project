@@ -207,20 +207,21 @@ class MetadataFilterBuilder:
     def _build_num_image_filter(self, num_images: List[int]) -> str:
         """
         Construye filtro para números de imagen.
-        
+
+        El campo del esquema es `image_number` (VARCHAR): los chunks de imagen guardan
+        su número en el documento como texto ("5") y los de texto lo dejan vacío.
+
         Args:
             num_images: Lista de números de imagen.
-        
+
         Returns:
-            str: Filtro de imágenes.
+            str: Filtro de imágenes. Ej: 'image_number in ["2", "3"]'
         """
-        # TODO: Implementar lógica de filtrado por número de imagen
         if not num_images:
             return ""
-        
-        # Ejemplo: 'image_number in [1, 2, 3]'
+
         images_str = ", ".join([f'"{n}"' for n in num_images])
-        return f'num_image in [{images_str}]'
+        return f'image_number in [{images_str}]'
     
     def validate_filter(self, filter_expr: str) -> bool:
         """
