@@ -15,6 +15,60 @@ from ..types import (
 )
 
 
+def _mostly_inside(inner: fitz.Rect, outer: fitz.Rect, ratio: float = 0.5) -> bool:
+    """True if more than ``ratio`` of ``inner``'s area lies within ``outer``."""
+    area = inner.get_area()
+    if area == 0:
+        return outer.contains(inner.tl)
+    return (inner & outer).get_area() / area > ratio
+
+
+def _split_by_gaps(items: list, axis: str) -> list:
+    """
+    Splits (rect, text) items into groups separated by a gap that no item crosses.
+
+    ``axis="x"`` finds columns (vertical gaps), ``axis="y"`` finds bands
+    (horizontal gaps). Groups are returned left to right / top to bottom.
+    """
+    start, end = ("x0", "x1") if axis == "x" else ("y0", "y1")
+    items = sorted(items, key=lambda it: getattr(it[0], start))
+    groups = [[items[0]]]
+    group_end = getattr(items[0][0], end)
+    for item in items[1:]:
+        if getattr(item[0], start) > group_end:
+            groups.append([item])
+        else:
+            groups[-1].append(item)
+        group_end = max(group_end, getattr(item[0], end))
+    return groups
+
+
+def _reading_order(items: list) -> list:
+    """
+    Sorts (rect, text) items in reading order with a recursive XY-cut.
+
+    At each level the region is first split into columns (vertical gaps no
+    item crosses) and each column is read entirely before the next one; if
+    there are no columns, it is split into horizontal bands read top to bottom.
+    This keeps multi-column brochure layouts readable: each column stays
+    together and a label stays with the heading of its own column, even when
+    the heading of the next column starts a few points higher.
+    """
+    if len(items) <= 1:
+        return list(items)
+    for axis in ("x", "y"):
+        groups = _split_by_gaps(items, axis)
+        if len(groups) > 1:
+            return [item for group in groups for item in _reading_order(group)]
+    # Overlapping items that cannot be separated: top to bottom, left to right
+    return sorted(items, key=lambda it: (it[0].y0, it[0].x0))
+
+
+def _chars(text: str) -> int:
+    """Number of non-whitespace characters."""
+    return sum(1 for c in text if not c.isspace())
+
+
 class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
     """Extractor for PDF files"""
     
@@ -171,8 +225,7 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             
             for page_num in range(total_pages):
                 page = doc[page_num]
-                text = page.get_text()
-                text_pages.append(text)
+                text_pages.append(self._page_to_text(page, page_num + 1))
             
             doc.close()
             
@@ -195,6 +248,91 @@ class PDFExtractor(BaseDocumentExtractor[PDFFileMetadata]):
             )
             raise Exception(f"Error extracting text from PDF: {str(e)}") from e
     
+    def _page_to_text(self, page, page_number: int) -> str:
+        """
+        Extracts the text of a page keeping its layout readable for the LLM.
+
+        - Tables are converted to markdown, so each value stays next to its
+          row and column headers instead of ending up as a loose number.
+        - The rest of the text is read block by block in visual reading order
+          (columns, then bands; see ``_reading_order``), so labels like
+          "Solo en Plug-in" stay next to the heading they belong to.
+
+        If anything goes wrong, falls back to the plain ``page.get_text()``.
+        """
+        try:
+            tables = self._find_tables(page)
+
+            items = []  # (rect, text)
+            skipped = {id(t): [] for t, _ in tables}
+            for x0, y0, x1, y1, text, _block_no, block_type in page.get_text("blocks"):
+                if block_type != 0 or not text.strip():  # 0 = text block
+                    continue
+                block_rect = fitz.Rect(x0, y0, x1, y1)
+                table = next((t for t, rect in tables if _mostly_inside(block_rect, rect)), None)
+                if table is not None:
+                    skipped[id(table)].append((block_rect, text.strip()))
+                    continue
+                items.append((block_rect, text.strip()))
+
+            for table, rect in tables:
+                markdown = self._table_to_markdown(page, table)
+                # Safety net: if the markdown lost text, keep the original blocks.
+                if _chars(markdown) < 0.8 * _chars("".join(t for _, t in skipped[id(table)])):
+                    self.logger.debug(
+                        "Table discarded: markdown lost text",
+                        extra={"file_name": self.file_name, "page": page_number},
+                    )
+                    items.extend(skipped[id(table)])
+                    continue
+                items.append((rect, markdown))
+
+            return "\n\n".join(text for _, text in _reading_order(items))
+
+        except Exception as e:
+            self.logger.warning(
+                f"Layout-aware extraction failed, using plain text: {str(e)}",
+                extra={"file_name": self.file_name, "page": page_number},
+            )
+            return page.get_text()
+
+    @staticmethod
+    def _find_tables(page) -> list:
+        """Returns [(table, rect)] for tables with at least 2 rows and 2 columns."""
+        found = []
+        for table in page.find_tables().tables:
+            if table.row_count >= 2 and table.col_count >= 2:
+                found.append((table, fitz.Rect(table.bbox)))
+        return found
+
+    @staticmethod
+    def _table_to_markdown(page, table) -> str:
+        """
+        Converts a detected table to markdown.
+
+        The text of each cell is read again clipping the page to the cell box:
+        the text that ``table.extract()`` returns comes out broken in PDFs with
+        manual letter spacing (e.g. "P otenci (CV) a").
+        """
+        rows = []
+        for row in table.rows:
+            cells = []
+            for cell in row.cells:
+                text = page.get_text("text", clip=fitz.Rect(cell)) if cell else ""
+                cells.append(" ".join(text.split()).replace("|", "\\|"))
+            if any(cells):
+                rows.append(cells)
+        if not rows:
+            return ""
+
+        # Drop columns that are empty in every row (layout spacers)
+        keep = [i for i in range(len(rows[0])) if any(r[i] for r in rows)]
+        rows = [[r[i] for i in keep] for r in rows]
+
+        lines = ["| " + " | ".join(rows[0]) + " |", "|" + "---|" * len(keep)]
+        lines += ["| " + " | ".join(r) + " |" for r in rows[1:]]
+        return "\n".join(lines)
+
     def _extract_images_from_pdf(self) -> List[ImageData]:
         """
         Extracts images from each page of the PDF

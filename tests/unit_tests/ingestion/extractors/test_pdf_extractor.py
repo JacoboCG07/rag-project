@@ -310,3 +310,150 @@ class TestPDFExtractor:
             extractor._extract_text_from_pdf()
 
         assert "Error extracting text from PDF" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Layout-aware text extraction (tables as markdown + reading order)
+# ---------------------------------------------------------------------------
+
+from ingestion.extractors import pdf_extractor as pdf_extractor_module
+
+
+def _save_temp_pdf(doc) -> str:
+    temp_path = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False).name
+    doc.save(temp_path)
+    doc.close()
+    return temp_path
+
+
+@pytest.fixture
+def table_pdf_file():
+    """PDF with a title and a 3x3 table drawn with lines (like a spec sheet)."""
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 60), "COMPARATIVA")
+
+    rows = [["PRESTACIONES", "HYBRID 140", "HYBRID 200"],
+            ["Potencia (CV)", "140", "180"],
+            ["Maletero (l)", "388", "362"]]
+    x_edges = [50, 200, 300, 400]
+    y_edges = [100, 130, 160, 190]
+    for x in x_edges:
+        page.draw_line((x, y_edges[0]), (x, y_edges[-1]))
+    for y in y_edges:
+        page.draw_line((x_edges[0], y), (x_edges[-1], y))
+    for r, row in enumerate(rows):
+        for c, text in enumerate(row):
+            page.insert_text((x_edges[c] + 5, y_edges[r] + 20), text, fontsize=9)
+
+    page.insert_text((50, 230), "Configura tu coche")
+    path = _save_temp_pdf(doc)
+    yield path
+    os.unlink(path)
+
+
+@pytest.fixture
+def columns_pdf_file():
+    """PDF with a heading and two columns whose tops differ by 1.5 points."""
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 60), "ACABADO GR SPORT PLUS")
+    page.insert_text((50, 80), "Solo en Plug-in Hybrid 220")
+    page.insert_text((50, 121.5), "Columna izquierda")
+    page.insert_text((320, 120), "Columna derecha")
+    path = _save_temp_pdf(doc)
+    yield path
+    os.unlink(path)
+
+
+class TestPDFLayoutExtraction:
+    """Tests for tables converted to markdown and visual reading order."""
+
+    def test_table_is_converted_to_markdown(self, table_pdf_file):
+        text = PDFExtractor(table_pdf_file)._extract_text_from_pdf()[0]
+
+        assert "| PRESTACIONES | HYBRID 140 | HYBRID 200 |" in text
+        assert "|---|---|---|" in text
+        assert "| Potencia (CV) | 140 | 180 |" in text
+        assert "| Maletero (l) | 388 | 362 |" in text
+
+    def test_table_text_is_not_duplicated_and_keeps_position(self, table_pdf_file):
+        text = PDFExtractor(table_pdf_file)._extract_text_from_pdf()[0]
+
+        assert text.count("Potencia (CV)") == 1
+        assert text.index("COMPARATIVA") < text.index("| PRESTACIONES") < text.index("Configura tu coche")
+
+    def test_columns_starting_at_almost_same_height_are_read_left_to_right(self, columns_pdf_file):
+        text = PDFExtractor(columns_pdf_file)._extract_text_from_pdf()[0]
+
+        assert text.index("ACABADO GR SPORT PLUS") < text.index("Solo en Plug-in Hybrid 220")
+        assert text.index("Solo en Plug-in Hybrid 220") < text.index("Columna izquierda")
+        assert text.index("Columna izquierda") < text.index("Columna derecha")
+
+    def test_table_discarded_when_markdown_loses_text(self, table_pdf_file, monkeypatch):
+        monkeypatch.setattr(PDFExtractor, "_table_to_markdown", staticmethod(lambda page, table: ""))
+
+        text = PDFExtractor(table_pdf_file)._extract_text_from_pdf()[0]
+
+        assert "|---|" not in text
+        assert "Potencia (CV)" in text
+        assert "388" in text
+
+    def test_falls_back_to_plain_text_on_layout_error(self, sample_pdf_file, monkeypatch):
+        def boom(page):
+            raise RuntimeError("table detection failed")
+
+        monkeypatch.setattr(PDFExtractor, "_find_tables", staticmethod(boom))
+
+        text_pages = PDFExtractor(sample_pdf_file)._extract_text_from_pdf()
+
+        assert "page 1" in text_pages[0].lower()
+        assert "page 2" in text_pages[1].lower()
+
+
+def _order(blocks):
+    """Runs _reading_order over [(x0, y0, x1, y1, text)] and returns the texts."""
+    items = [(fitz.Rect(x0, y0, x1, y1), text) for x0, y0, x1, y1, text in blocks]
+    return [text for _, text in pdf_extractor_module._reading_order(items)]
+
+
+class TestReadingOrder:
+    """XY-cut reading order, with block layouts taken from real catalogs."""
+
+    def test_columns_starting_at_almost_same_height_are_read_left_to_right(self):
+        # C-HR p. 8: three columns whose tops differ by ~1 point
+        blocks = [
+            (46, 3215, 277, 3371, "ACABADO GR SPORT PLUS"),
+            (45, 3452, 284, 3477, "Solo en Plug-in Hybrid 220"),
+            (393, 3495.4, 720, 3598, "col 2"),
+            (740, 3495.4, 1068, 3612, "col 3"),
+            (46, 3496.6, 375, 3613, "col 1"),
+        ]
+
+        assert _order(blocks) == ["ACABADO GR SPORT PLUS", "Solo en Plug-in Hybrid 220",
+                                  "col 1", "col 2", "col 3"]
+
+    def test_label_stays_in_its_column_when_next_column_heading_is_higher(self):
+        # Yaris p. 12: the right column heading starts above the left column label
+        blocks = [
+            (45, 170, 338, 304, "ACABADO GR SPORT"),
+            (46, 400, 592, 434, "Solo disponible en la motorizacion Hybrid 130"),
+            (45, 475, 384, 586, "lista GR SPORT"),
+            (393, 474, 614, 523, "lista GR SPORT 2"),
+            (751, 381, 957, 415, "OPCION PACK GR SPORT PLUS"),
+            (751, 418, 1042, 576, "lista PACK"),
+        ]
+
+        assert _order(blocks) == ["ACABADO GR SPORT", "Solo disponible en la motorizacion Hybrid 130",
+                                  "lista GR SPORT", "lista GR SPORT 2",
+                                  "OPCION PACK GR SPORT PLUS", "lista PACK"]
+
+    def test_columns_made_of_line_blocks_are_not_interleaved(self):
+        # Land Cruiser p. 9: each line of each column is a separate block
+        blocks = []
+        for x0, name in [(40, "GX"), (440, "VX"), (825, "VXL")]:
+            for i in range(3):
+                y0 = 1430 + i * 19
+                blocks.append((x0, y0, x0 + 260, y0 + 21, f"{name} linea {i}"))
+
+        assert _order(blocks) == [f"{name} linea {i}" for name in ("GX", "VX", "VXL") for i in range(3)]
