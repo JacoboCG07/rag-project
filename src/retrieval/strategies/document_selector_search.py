@@ -57,6 +57,8 @@ class DocumentSelectorSearchStrategy(SearchStrategy):
             dbname=config.milvus.dbname,
             collection_name=config.collection_name,
             text_model=config.text_model,
+            max_tokens=config.chooser_max_tokens,
+            temperature=config.chooser_temperature,
             uri=config.milvus.uri,
             token=config.milvus.token,
             host=config.milvus.host,

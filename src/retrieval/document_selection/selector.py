@@ -21,6 +21,8 @@ class DocumentSelector:
         dbname: str,
         collection_name: str,
         text_model: BaseTextModel,
+        max_tokens: int = 2000,
+        temperature: float = 0.2,
         uri: Optional[str] = None,
         token: Optional[str] = None,
         host: Optional[str] = None,
@@ -33,6 +35,9 @@ class DocumentSelector:
             dbname: Database name.
             collection_name: Summaries collection name.
             text_model: LLM model for selection.
+            max_tokens: Maximum tokens for the LLM response (on reasoning models it
+                also includes reasoning tokens).
+            temperature: Temperature for the LLM (0.0-1.0).
             uri: Connection URI (optional).
             token: Authentication token (optional).
             host: Milvus host (optional).
@@ -54,8 +59,8 @@ class DocumentSelector:
         
         self.chooser = LLMDocumentChooser(
             text_model=text_model,
-            max_tokens=500,
-            temperature=0.2
+            max_tokens=max_tokens,
+            temperature=temperature
         )
         
         self.logger.info("DocumentSelector initialized")
